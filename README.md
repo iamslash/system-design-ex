@@ -28,11 +28,11 @@ System Design Interview 학습을 위한 실행 가능한 예제 모음.
 | [19](19-design-google-maps/) | Google Maps | 실행 가능 | :white_check_mark: |
 | [20](20-design-distributed-message-queue/) | Distributed Message Queue | 실행 가능 | :white_check_mark: |
 | [21](21-design-metrics-monitoring/) | Metrics Monitoring and Alerting System | 실행 가능 | :white_check_mark: |
-| 22 | Ad Click Event Aggregation | - | |
-| 23 | Hotel Reservation System | - | |
-| 24 | Distributed Email Service | - | |
-| 25 | S3-like Object Storage | - | |
-| 26 | Real-time Gaming Leaderboard | - | |
+| [22](22-design-ad-click-aggregation/) | Ad Click Event Aggregation | 실행 가능 | :white_check_mark: |
+| [23](23-design-hotel-reservation/) | Hotel Reservation System | 실행 가능 | :white_check_mark: |
+| [24](24-design-distributed-email-service/) | Distributed Email Service | 실행 가능 | :white_check_mark: |
+| [25](25-design-s3-object-storage/) | S3-like Object Storage | 실행 가능 | :white_check_mark: |
+| [26](26-design-gaming-leaderboard/) | Real-time Gaming Leaderboard | 실행 가능 | :white_check_mark: |
 | 27 | Payment System | - | |
 | 28 | Digital Wallet | - | |
 | 29 | Stock Exchange | - | |
