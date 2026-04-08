@@ -23,11 +23,11 @@ System Design Interview 학습을 위한 실행 가능한 예제 모음.
 | [14](14-design-a-search-autocomplete-system/) | Design A Search Autocomplete System | 실행 가능 | :white_check_mark: |
 | [15](15-design-youtube/) | Design YouTube | 실행 가능 | :white_check_mark: |
 | [16](16-design-google-drive/) | Design Google Drive | 실행 가능 | :white_check_mark: |
-| 17 | Proximity Service | - | |
-| 18 | Nearby Friends | - | |
-| 19 | Google Maps | - | |
-| 20 | Distributed Message Queue | - | |
-| 21 | Metrics Monitoring and Alerting System | - | |
+| [17](17-design-proximity-service/) | Proximity Service | 실행 가능 | :white_check_mark: |
+| [18](18-design-nearby-friends/) | Nearby Friends | 실행 가능 | :white_check_mark: |
+| [19](19-design-google-maps/) | Google Maps | 실행 가능 | :white_check_mark: |
+| [20](20-design-distributed-message-queue/) | Distributed Message Queue | 실행 가능 | :white_check_mark: |
+| [21](21-design-metrics-monitoring/) | Metrics Monitoring and Alerting System | 실행 가능 | :white_check_mark: |
 | 22 | Ad Click Event Aggregation | - | |
 | 23 | Hotel Reservation System | - | |
 | 24 | Distributed Email Service | - | |
