@@ -1,0 +1,90 @@
+services:
+  node1:
+    build:
+      context: ./node
+      dockerfile: Dockerfile
+    container_name: kv-node1
+    environment:
+      NODE_ID: node1
+      CLUSTER_NODES: "node1:8000,node2:8000,node3:8000"
+      REPLICATION_FACTOR: "3"
+      WRITE_QUORUM: "2"
+      READ_QUORUM: "2"
+      GOSSIP_INTERVAL: "1"
+      MEMTABLE_THRESHOLD: "100"
+      DATA_DIR: /data
+    ports:
+      - "8071:8000"
+    volumes:
+      - node1-data:/data
+    networks:
+      - kvnet
+    healthcheck:
+      test: ["CMD", "python", "-c", "import httpx; httpx.get('http://localhost:8000/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+
+  node2:
+    build:
+      context: ./node
+      dockerfile: Dockerfile
+    container_name: kv-node2
+    environment:
+      NODE_ID: node2
+      CLUSTER_NODES: "node1:8000,node2:8000,node3:8000"
+      REPLICATION_FACTOR: "3"
+      WRITE_QUORUM: "2"
+      READ_QUORUM: "2"
+      GOSSIP_INTERVAL: "1"
+      MEMTABLE_THRESHOLD: "100"
+      DATA_DIR: /data
+    ports:
+      - "8072:8000"
+    volumes:
+      - node2-data:/data
+    networks:
+      - kvnet
+    healthcheck:
+      test: ["CMD", "python", "-c", "import httpx; httpx.get('http://localhost:8000/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+
+  node3:
+    build:
+      context: ./node
+      dockerfile: Dockerfile
+    container_name: kv-node3
+    environment:
+      NODE_ID: node3
+      CLUSTER_NODES: "node1:8000,node2:8000,node3:8000"
+      REPLICATION_FACTOR: "3"
+      WRITE_QUORUM: "2"
+      READ_QUORUM: "2"
+      GOSSIP_INTERVAL: "1"
+      MEMTABLE_THRESHOLD: "100"
+      DATA_DIR: /data
+    ports:
+      - "8073:8000"
+    volumes:
+      - node3-data:/data
+    networks:
+      - kvnet
+    healthcheck:
+      test: ["CMD", "python", "-c", "import httpx; httpx.get('http://localhost:8000/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  node1-data:
+  node2-data:
+  node3-data:
+
+networks:
+  kvnet:
+    driver: bridge

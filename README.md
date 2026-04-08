@@ -1,2 +1,50 @@
-# system-design-ex
-awesome system design practice
+# System Design Interview Examples
+
+System Design Interview 학습을 위한 실행 가능한 예제 모음.
+
+## Agenda
+
+| # | 주제 | 타입 | 상태 |
+|---|------|------|------|
+| [00](00-foreword/) | Foreword | 개념 | :white_check_mark: |
+| [01](01-join-the-community/) | Join the Community | 개념 | :white_check_mark: |
+| [02](02-scale-from-zero-to-millions/) | Scale From Zero To Millions Of Users | 개념 | :white_check_mark: |
+| [03](03-back-of-the-envelope-estimation/) | Back-of-the-envelope Estimation | 개념 | :white_check_mark: |
+| [04](04-framework-for-system-design-interviews/) | A Framework For System Design Interviews | 개념 | :white_check_mark: |
+| [05](05-design-a-rate-limiter/) | Design A Rate Limiter | 실행 가능 | :white_check_mark: |
+| [06](06-design-consistent-hashing/) | Design Consistent Hashing | 실행 가능 | :white_check_mark: |
+| [07](07-design-a-key-value-store/) | Design A Key-value Store | 실행 가능 | :white_check_mark: |
+| 08 | Design A Unique ID Generator In Distributed Systems | - | |
+| 09 | Design A URL Shortener | - | |
+| 10 | Design A Web Crawler | - | |
+| 11 | Design A Notification System | - | |
+| 12 | Design A News Feed System | - | |
+| 13 | Design A Chat System | - | |
+| 14 | Design A Search Autocomplete System | - | |
+| 15 | Design YouTube | - | |
+| 16 | Design Google Drive | - | |
+| 17 | Proximity Service | - | |
+| 18 | Nearby Friends | - | |
+| 19 | Google Maps | - | |
+| 20 | Distributed Message Queue | - | |
+| 21 | Metrics Monitoring and Alerting System | - | |
+| 22 | Ad Click Event Aggregation | - | |
+| 23 | Hotel Reservation System | - | |
+| 24 | Distributed Email Service | - | |
+| 25 | S3-like Object Storage | - | |
+| 26 | Real-time Gaming Leaderboard | - | |
+| 27 | Payment System | - | |
+| 28 | Digital Wallet | - | |
+| 29 | Stock Exchange | - | |
+| 30 | The Learning Continues | - | |
+
+## 기술 스택
+
+- **언어**: Python 3.11+
+- **프레임워크**: FastAPI
+- **인프라**: Redis, Docker Compose
+- **테스트**: pytest
+
+## 빠른 시작
+
+각 디렉토리의 README.md 참조. 실행 가능한 예제는 `docker-compose up --build` 또는 `python` 명령으로 실행.
