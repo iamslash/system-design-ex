@@ -18,8 +18,8 @@ System Design Interview 학습을 위한 실행 가능한 예제 모음.
 | [09](09-design-a-url-shortener/) | Design A URL Shortener | 실행 가능 | :white_check_mark: |
 | [10](10-design-a-web-crawler/) | Design A Web Crawler | 실행 가능 | :white_check_mark: |
 | [11](11-design-a-notification-system/) | Design A Notification System | 실행 가능 | :white_check_mark: |
-| 12 | Design A News Feed System | - | |
-| 13 | Design A Chat System | - | |
+| [12](12-design-a-news-feed-system/) | Design A News Feed System | 실행 가능 | :white_check_mark: |
+| [13](13-design-a-chat-system/) | Design A Chat System | 실행 가능 | :white_check_mark: |
 | 14 | Design A Search Autocomplete System | - | |
 | 15 | Design YouTube | - | |
 | 16 | Design Google Drive | - | |
