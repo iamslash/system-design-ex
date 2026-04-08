@@ -1,0 +1,40 @@
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    volumes:
+      - redis-data:/data
+
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    ports:
+      - "8011:8011"
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - RATE_LIMIT_PUSH=${RATE_LIMIT_PUSH:-10}
+      - RATE_LIMIT_SMS=${RATE_LIMIT_SMS:-5}
+      - RATE_LIMIT_EMAIL=${RATE_LIMIT_EMAIL:-20}
+      - FAILURE_RATE=${FAILURE_RATE:-0.1}
+      - WORKER_POLL_INTERVAL=${WORKER_POLL_INTERVAL:-1}
+      - MAX_RETRIES=${MAX_RETRIES:-3}
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8011/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+volumes:
+  redis-data:

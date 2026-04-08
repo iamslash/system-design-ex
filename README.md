@@ -14,10 +14,10 @@ System Design Interview 학습을 위한 실행 가능한 예제 모음.
 | [05](05-design-a-rate-limiter/) | Design A Rate Limiter | 실행 가능 | :white_check_mark: |
 | [06](06-design-consistent-hashing/) | Design Consistent Hashing | 실행 가능 | :white_check_mark: |
 | [07](07-design-a-key-value-store/) | Design A Key-value Store | 실행 가능 | :white_check_mark: |
-| 08 | Design A Unique ID Generator In Distributed Systems | - | |
-| 09 | Design A URL Shortener | - | |
-| 10 | Design A Web Crawler | - | |
-| 11 | Design A Notification System | - | |
+| [08](08-design-a-unique-id-generator/) | Design A Unique ID Generator In Distributed Systems | 실행 가능 | :white_check_mark: |
+| [09](09-design-a-url-shortener/) | Design A URL Shortener | 실행 가능 | :white_check_mark: |
+| [10](10-design-a-web-crawler/) | Design A Web Crawler | 실행 가능 | :white_check_mark: |
+| [11](11-design-a-notification-system/) | Design A Notification System | 실행 가능 | :white_check_mark: |
 | 12 | Design A News Feed System | - | |
 | 13 | Design A Chat System | - | |
 | 14 | Design A Search Autocomplete System | - | |
