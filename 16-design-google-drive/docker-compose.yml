@@ -1,0 +1,39 @@
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    volumes:
+      - redis-data:/data
+
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    ports:
+      - "8016:8016"
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - BLOCK_SIZE=${BLOCK_SIZE:-4096}
+      - POLL_TIMEOUT=${POLL_TIMEOUT:-30}
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      - block-data:/data/blocks
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8016/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+volumes:
+  redis-data:
+  block-data:
