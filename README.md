@@ -33,10 +33,10 @@ System Design Interview 학습을 위한 실행 가능한 예제 모음.
 | [24](24-design-distributed-email-service/) | Distributed Email Service | 실행 가능 | :white_check_mark: |
 | [25](25-design-s3-object-storage/) | S3-like Object Storage | 실행 가능 | :white_check_mark: |
 | [26](26-design-gaming-leaderboard/) | Real-time Gaming Leaderboard | 실행 가능 | :white_check_mark: |
-| 27 | Payment System | - | |
-| 28 | Digital Wallet | - | |
-| 29 | Stock Exchange | - | |
-| 30 | The Learning Continues | - | |
+| [27](27-design-payment-system/) | Payment System | 실행 가능 | :white_check_mark: |
+| [28](28-design-digital-wallet/) | Digital Wallet | 실행 가능 | :white_check_mark: |
+| [29](29-design-stock-exchange/) | Stock Exchange | 실행 가능 | :white_check_mark: |
+| [30](30-the-learning-continues/) | The Learning Continues | 개념 | :white_check_mark: |
 
 ## 기술 스택
 
