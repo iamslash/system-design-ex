@@ -97,7 +97,7 @@ def cmd_upload(args: argparse.Namespace) -> None:
     title = args.title or os.path.basename(file_path)
     description = args.description or ""
 
-    # 파일 크기에 따라 청크 수 결정
+    # Determine number of chunks based on file size
     file_size = os.path.getsize(file_path)
     chunk_size = 1024 * 1024  # 1MB chunks
     total_chunks = max(1, (file_size + chunk_size - 1) // chunk_size)
@@ -106,7 +106,7 @@ def cmd_upload(args: argparse.Namespace) -> None:
     print(f"  Title: {title}")
     print(f"  Size: {file_size} bytes ({total_chunks} chunks)")
 
-    # 1. 업로드 시작
+    # 1. Initiate upload
     status, body = _json_request("POST", "/api/v1/videos/upload", {
         "title": title,
         "description": description,
@@ -122,7 +122,7 @@ def cmd_upload(args: argparse.Namespace) -> None:
     print(f"  Upload ID: {upload_id}")
     print(f"  Video ID: {video_id}")
 
-    # 2. 청크 업로드
+    # 2. Upload chunks
     with open(file_path, "rb") as f:
         for i in range(total_chunks):
             chunk_data = f.read(chunk_size)
@@ -135,7 +135,7 @@ def cmd_upload(args: argparse.Namespace) -> None:
                 sys.exit(1)
             print(f"  Chunk {i+1}/{total_chunks} uploaded")
 
-    # 3. 업로드 완료 + 트랜스코딩
+    # 3. Complete upload + transcode
     status, body = _json_request("POST", f"/api/v1/videos/upload/{upload_id}/complete")
     if status != 200:
         print(f"Complete failed [{status}]: {body.get('detail', body)}")
@@ -180,7 +180,7 @@ def cmd_stream(args: argparse.Namespace) -> None:
     resolution = args.resolution or "720p"
     path = f"/api/v1/videos/{args.video_id}/stream?resolution={resolution}"
 
-    # Range 헤더로 첫 1KB 요청 (시뮬레이션)
+    # Request first 1KB using Range header (simulation)
     headers = {"Range": "bytes=0-1023"}
     status, body = _request("GET", path, headers=headers)
 
@@ -195,6 +195,7 @@ def cmd_stream(args: argparse.Namespace) -> None:
 
 
 def main() -> None:
+    global BASE_URL
     parser = argparse.ArgumentParser(description="Video Streaming System CLI Client")
     parser.add_argument("--health", action="store_true", help="Run health check")
     parser.add_argument("--base-url", type=str, default=BASE_URL, help="API base URL")
@@ -221,7 +222,6 @@ def main() -> None:
 
     args = parser.parse_args()
 
-    global BASE_URL
     BASE_URL = args.base_url
 
     if args.health:

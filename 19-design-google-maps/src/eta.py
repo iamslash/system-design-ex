@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from .graph import RoadGraph
+from .graph import Edge, RoadGraph
 
 
 @dataclass
@@ -109,7 +109,7 @@ def compute_eta(
     )
 
 
-def _find_edge(graph: RoadGraph, src: str, dst: str):
+def _find_edge(graph: RoadGraph, src: str, dst: str) -> Edge | None:
     """Find the edge from src to dst."""
     for edge in graph.get_neighbors(src):
         if edge.dst == dst:

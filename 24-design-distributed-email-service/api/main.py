@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import threading
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 import redis
@@ -41,7 +42,7 @@ def get_redis() -> redis.Redis:
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Start the SMTP worker thread on startup."""
     r = get_redis()
     worker_thread = threading.Thread(
@@ -66,7 +67,7 @@ app = FastAPI(
 
 
 @app.post("/api/email/send", response_model=Email)
-def api_send_email(req: SendEmailRequest):
+def api_send_email(req: SendEmailRequest) -> Email:
     """Send an email. Queues for async SMTP delivery."""
     r = get_redis()
     email = send_email(
@@ -84,7 +85,7 @@ def api_send_email(req: SendEmailRequest):
 
 
 @app.post("/api/email/deliver")
-def api_deliver_now():
+def api_deliver_now() -> dict:
     """Manually trigger delivery of queued emails (for testing)."""
     r = get_redis()
     count = 0
@@ -94,7 +95,7 @@ def api_deliver_now():
 
 
 @app.get("/api/email/{email_id}", response_model=Email)
-def api_get_email(email_id: str):
+def api_get_email(email_id: str) -> Email:
     """Retrieve a single email by ID."""
     r = get_redis()
     email = get_email(r, email_id)
@@ -104,7 +105,7 @@ def api_get_email(email_id: str):
 
 
 @app.post("/api/email/{email_id}/read")
-def api_mark_read(email_id: str):
+def api_mark_read(email_id: str) -> dict:
     """Mark an email as read."""
     r = get_redis()
     if not mark_as_read(r, email_id):
@@ -113,7 +114,7 @@ def api_mark_read(email_id: str):
 
 
 @app.post("/api/email/{email_id}/unread")
-def api_mark_unread(email_id: str):
+def api_mark_unread(email_id: str) -> dict:
     """Mark an email as unread."""
     r = get_redis()
     if not mark_as_unread(r, email_id):
@@ -122,7 +123,7 @@ def api_mark_unread(email_id: str):
 
 
 @app.get("/api/email/{email_id}/attachment/{attachment_id}")
-def api_get_attachment(email_id: str, attachment_id: str):
+def api_get_attachment(email_id: str, attachment_id: str) -> dict:
     """Retrieve attachment metadata."""
     r = get_redis()
     att = get_attachment(r, email_id, attachment_id)
@@ -135,7 +136,7 @@ def api_get_attachment(email_id: str, attachment_id: str):
 
 
 @app.get("/api/thread/{thread_id}", response_model=list[Email])
-def api_get_thread(thread_id: str):
+def api_get_thread(thread_id: str) -> list[Email]:
     """Get all emails in a thread."""
     r = get_redis()
     return get_thread(r, thread_id)
@@ -145,7 +146,7 @@ def api_get_thread(thread_id: str):
 
 
 @app.get("/api/folders/{user}")
-def api_list_folders(user: str):
+def api_list_folders(user: str) -> dict:
     """List all folders for a user."""
     r = get_redis()
     ensure_default_folders(r, user)
@@ -153,7 +154,7 @@ def api_list_folders(user: str):
 
 
 @app.get("/api/folders/{user}/{folder}")
-def api_get_folder(user: str, folder: str):
+def api_get_folder(user: str, folder: str) -> dict:
     """Get all emails in a folder."""
     r = get_redis()
     emails = get_folder_emails(r, user, folder)
@@ -161,7 +162,7 @@ def api_get_folder(user: str, folder: str):
 
 
 @app.get("/api/folders/{user}/{folder}/unread")
-def api_folder_unread(user: str, folder: str):
+def api_folder_unread(user: str, folder: str) -> dict:
     """Get unread count for a folder."""
     r = get_redis()
     count = get_folder_unread_count(r, user, folder)
@@ -169,7 +170,7 @@ def api_folder_unread(user: str, folder: str):
 
 
 @app.post("/api/folders/create")
-def api_create_folder(req: FolderCreateRequest):
+def api_create_folder(req: FolderCreateRequest) -> dict:
     """Create a custom folder."""
     r = get_redis()
     created = create_custom_folder(r, req.user, req.folder_name)
@@ -179,7 +180,7 @@ def api_create_folder(req: FolderCreateRequest):
 
 
 @app.post("/api/email/move")
-def api_move_email(req: MoveEmailRequest):
+def api_move_email(req: MoveEmailRequest) -> dict:
     """Move an email to a different folder."""
     r = get_redis()
     email = get_email(r, req.email_id)
@@ -195,7 +196,7 @@ def api_move_email(req: MoveEmailRequest):
 
 
 @app.delete("/api/email/{user}/{email_id}")
-def api_delete_email(user: str, email_id: str):
+def api_delete_email(user: str, email_id: str) -> dict:
     """Delete an email (move to trash, or permanent if already in trash)."""
     r = get_redis()
     email = get_email(r, email_id)
@@ -212,7 +213,7 @@ def api_delete_email(user: str, email_id: str):
 
 
 @app.post("/api/email/search")
-def api_search(req: SearchRequest):
+def api_search(req: SearchRequest) -> dict:
     """Search emails by keyword."""
     r = get_redis()
     email_ids = search_emails(r, req.user, req.query)
@@ -225,7 +226,7 @@ def api_search(req: SearchRequest):
 
 
 @app.get("/health")
-def health():
+def health() -> dict:
     """Health check."""
     r = get_redis()
     try:

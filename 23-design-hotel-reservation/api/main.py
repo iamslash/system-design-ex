@@ -31,7 +31,7 @@ _reservation_service: Optional[ReservationService] = None
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI) -> None:
     """Startup / shutdown lifecycle."""
     global _redis, _hotel_service, _inventory_service, _reservation_service
 

@@ -1,7 +1,7 @@
 """File version history management.
 
-각 업로드마다 새 버전을 생성하고, 이전 버전을 보존한다.
-특정 버전으로 복원(restore) 할 수 있다.
+Creates a new version on each upload and preserves previous versions.
+Supports restoring to a specific version.
 """
 
 from __future__ import annotations
@@ -23,14 +23,14 @@ async def create_version(
     block_hashes: list[str],
     size: int,
 ) -> None:
-    """파일의 새 버전을 저장한다.
+    """Save a new version of a file.
 
     Args:
-        redis: Redis 클라이언트
-        file_id: 파일 ID
-        version: 버전 번호
-        block_hashes: 이 버전을 구성하는 블록 해시 목록
-        size: 파일 크기 (바이트)
+        redis: Redis client
+        file_id: File ID
+        version: Version number
+        block_hashes: List of block hashes that make up this version
+        size: File size in bytes
     """
     now = datetime.now(timezone.utc).isoformat()
     await redis.hset(
@@ -50,10 +50,10 @@ async def get_version(
     file_id: str,
     version: int,
 ) -> dict[str, str] | None:
-    """특정 버전의 정보를 조회한다.
+    """Retrieve information for a specific version.
 
     Returns:
-        버전 데이터 딕셔너리 또는 None (버전이 없을 때)
+        Version data dictionary, or None if the version does not exist
     """
     data = await redis.hgetall(f"file_version:{file_id}:{version}")
     return data if data else None
@@ -63,10 +63,10 @@ async def get_revisions(
     redis: Redis,
     file_id: str,
 ) -> list[dict[str, Any]]:
-    """파일의 모든 버전 히스토리를 조회한다.
+    """Retrieve the full version history of a file.
 
     Returns:
-        버전 정보 리스트 (오래된 순)
+        List of version info dicts in chronological order (oldest first)
     """
     file_meta = await redis.hgetall(f"file:{file_id}")
     if not file_meta:
@@ -93,41 +93,41 @@ async def restore_version(
     file_id: str,
     target_version: int,
 ) -> dict[str, Any]:
-    """파일을 특정 버전으로 복원한다.
+    """Restore a file to a specific version.
 
-    복원은 대상 버전의 블록 해시 목록을 새 버전으로 복사하는 방식으로 동작한다.
-    기존 버전 히스토리는 유지되며, 복원 자체도 새 버전으로 기록된다.
+    Restoration works by copying the target version's block hash list as a new version.
+    The existing version history is preserved; the restore itself is recorded as a new version.
 
     Args:
-        redis: Redis 클라이언트
-        file_id: 파일 ID
-        target_version: 복원할 대상 버전 번호
+        redis: Redis client
+        file_id: File ID
+        target_version: The version number to restore to
 
     Returns:
-        복원 결과 정보
+        Restore result information
 
     Raises:
-        ValueError: 파일이나 대상 버전이 없을 때
+        ValueError: When the file or target version does not exist
     """
     file_meta = await redis.hgetall(f"file:{file_id}")
     if not file_meta:
         raise ValueError(f"File not found: {file_id}")
 
-    # 복원 대상 버전 조회
+    # Look up the target version to restore
     target_data = await get_version(redis, file_id, target_version)
     if target_data is None:
         raise ValueError(f"Version {target_version} not found for file {file_id}")
 
-    # 새 버전 번호
+    # Determine the new version number
     current_latest = int(file_meta["latest_version"])
     new_version = current_latest + 1
 
-    # 대상 버전의 블록 해시를 새 버전으로 복사
+    # Copy the target version's block hashes into the new version
     block_hashes = json.loads(target_data["block_hashes"])
     size = int(target_data["size"])
     await create_version(redis, file_id, new_version, block_hashes, size)
 
-    # 파일 메타데이터 갱신
+    # Update file metadata
     now = datetime.now(timezone.utc).isoformat()
     await redis.hset(
         f"file:{file_id}",
@@ -138,7 +138,7 @@ async def restore_version(
         },
     )
 
-    # 동기화 이벤트 발행
+    # Publish a sync event
     await publish_sync_event(redis, file_meta["user_id"], {
         "event_type": "restore",
         "file_id": file_id,

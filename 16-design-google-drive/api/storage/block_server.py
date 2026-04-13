@@ -1,7 +1,7 @@
 """Block server for file chunking, compression, and deduplication.
 
-파일을 고정 크기 블록으로 분할하고, 각 블록을 SHA-256 해시하여
-중복 블록은 한 번만 저장한다. zlib 압축으로 저장 공간을 절약한다.
+Splits files into fixed-size blocks, SHA-256 hashes each block, and
+stores duplicate blocks only once. Uses zlib compression to save storage space.
 """
 
 from __future__ import annotations
@@ -18,14 +18,14 @@ from config import settings
 
 
 def split_into_blocks(data: bytes, block_size: int | None = None) -> list[bytes]:
-    """파일 데이터를 고정 크기 블록으로 분할한다.
+    """Split file data into fixed-size blocks.
 
     Args:
-        data: 원본 파일 바이트 데이터
-        block_size: 블록 크기 (기본값: settings.BLOCK_SIZE)
+        data: Raw file bytes
+        block_size: Block size in bytes (default: settings.BLOCK_SIZE)
 
     Returns:
-        블록 리스트 (마지막 블록은 block_size 보다 작을 수 있다)
+        List of blocks; the last block may be smaller than block_size
     """
     if block_size is None:
         block_size = settings.BLOCK_SIZE
@@ -36,21 +36,21 @@ def split_into_blocks(data: bytes, block_size: int | None = None) -> list[bytes]
 
 
 def compute_block_hash(block: bytes) -> str:
-    """블록의 SHA-256 해시를 계산한다.
+    """Compute the SHA-256 hash of a block.
 
-    동일한 내용의 블록은 항상 동일한 해시를 반환하므로
-    중복 검사(dedup)에 사용된다.
+    Blocks with identical content always return the same hash,
+    so this is used for deduplication checks.
     """
     return hashlib.sha256(block).hexdigest()
 
 
 def compress_block(block: bytes) -> bytes:
-    """블록을 zlib 으로 압축한다."""
+    """Compress a block using zlib."""
     return zlib.compress(block)
 
 
 def decompress_block(compressed: bytes) -> bytes:
-    """압축된 블록을 원본으로 복원한다."""
+    """Decompress a compressed block back to its original form."""
     return zlib.decompress(compressed)
 
 
@@ -59,34 +59,34 @@ async def store_block(
     block: bytes,
     storage_path: str | None = None,
 ) -> tuple[str, bool]:
-    """블록을 저장한다. 이미 존재하는 블록이면 건너뛴다 (dedup).
+    """Store a block, skipping it if it already exists (dedup).
 
     Args:
-        redis: Redis 클라이언트 (블록 존재 여부 추적)
-        block: 원본 블록 데이터
-        storage_path: 블록 파일 저장 경로
+        redis: Redis client (tracks block existence)
+        block: Raw block data
+        storage_path: Directory path for block file storage
 
     Returns:
-        (block_hash, is_new) — 해시값과 새로 저장되었는지 여부
+        (block_hash, is_new) — the hash and whether the block was newly stored
     """
     if storage_path is None:
         storage_path = settings.BLOCK_STORAGE_PATH
 
     block_hash = compute_block_hash(block)
 
-    # 중복 검사: Redis 에 해시가 이미 있으면 저장하지 않는다
+    # Dedup check: skip storing if the hash already exists in Redis
     exists = await redis.exists(f"block:{block_hash}")
     if exists:
         return block_hash, False
 
-    # 압축 후 파일시스템에 저장
+    # Compress and write to the filesystem
     compressed = compress_block(block)
     block_path = os.path.join(storage_path, block_hash)
     os.makedirs(storage_path, exist_ok=True)
     with open(block_path, "wb") as f:
         f.write(compressed)
 
-    # Redis 에 블록 메타데이터 기록
+    # Record block metadata in Redis
     await redis.hset(
         f"block:{block_hash}",
         mapping={
@@ -102,17 +102,17 @@ async def load_block(
     block_hash: str,
     storage_path: str | None = None,
 ) -> bytes:
-    """저장된 블록을 읽어 압축 해제 후 반환한다.
+    """Read a stored block, decompress it, and return the original data.
 
     Args:
-        block_hash: 블록의 SHA-256 해시
-        storage_path: 블록 파일 저장 경로
+        block_hash: SHA-256 hash of the block
+        storage_path: Directory path where block files are stored
 
     Returns:
-        원본 블록 데이터
+        Original block data
 
     Raises:
-        FileNotFoundError: 블록 파일이 없을 때
+        FileNotFoundError: When the block file does not exist
     """
     if storage_path is None:
         storage_path = settings.BLOCK_STORAGE_PATH

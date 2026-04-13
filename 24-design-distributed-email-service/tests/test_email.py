@@ -6,14 +6,6 @@ Run: cd 24-design-distributed-email-service && pytest tests/ -v
 
 from __future__ import annotations
 
-import sys
-from pathlib import Path
-
-# Ensure api/ is on sys.path so imports resolve correctly
-API_DIR = str(Path(__file__).resolve().parent.parent / "api")
-if API_DIR not in sys.path:
-    sys.path.insert(0, API_DIR)
-
 import fakeredis
 import pytest
 
@@ -33,17 +25,11 @@ from folder.manager import (
 from worker.smtp_worker import process_one
 
 
-@pytest.fixture
-def r():
-    """Provide a fresh fakeredis instance per test."""
-    return fakeredis.FakeRedis(decode_responses=True)
-
-
 # ── Send ─────────────────────────────────────────────────────────────
 
 
 class TestSendEmail:
-    def test_send_basic(self, r):
+    def test_send_basic(self, r: fakeredis.FakeRedis) -> None:
         """Send a basic email and verify it is stored."""
         email = send_email(
             r,
@@ -58,7 +44,7 @@ class TestSendEmail:
         assert email.subject == "Hello"
         assert email.folder == FolderType.SENT
 
-    def test_send_creates_thread(self, r):
+    def test_send_creates_thread(self, r: fakeredis.FakeRedis) -> None:
         """Sending an email should auto-assign a thread_id."""
         email = send_email(
             r,
@@ -69,7 +55,7 @@ class TestSendEmail:
         )
         assert email.thread_id is not None
 
-    def test_send_stored_in_sent_folder(self, r):
+    def test_send_stored_in_sent_folder(self, r: fakeredis.FakeRedis) -> None:
         """Sent email appears in sender's Sent folder."""
         email = send_email(
             r,
@@ -81,7 +67,7 @@ class TestSendEmail:
         sent_ids = r.smembers("email:folder:alice@example.com:sent")
         assert email.email_id in sent_ids
 
-    def test_send_queues_for_delivery(self, r):
+    def test_send_queues_for_delivery(self, r: fakeredis.FakeRedis) -> None:
         """Sent email is pushed to the outgoing queue."""
         send_email(
             r,
@@ -93,7 +79,7 @@ class TestSendEmail:
         queue_len = r.llen("email:outgoing_queue")
         assert queue_len == 1
 
-    def test_send_with_cc(self, r):
+    def test_send_with_cc(self, r: fakeredis.FakeRedis) -> None:
         """Send with CC recipients."""
         email = send_email(
             r,
@@ -105,7 +91,7 @@ class TestSendEmail:
         )
         assert email.cc_addrs == ["carol@example.com"]
 
-    def test_send_with_bcc(self, r):
+    def test_send_with_bcc(self, r: fakeredis.FakeRedis) -> None:
         """Send with BCC recipients."""
         email = send_email(
             r,
@@ -122,7 +108,7 @@ class TestSendEmail:
 
 
 class TestReceiveEmail:
-    def test_deliver_to_inbox(self, r):
+    def test_deliver_to_inbox(self, r: fakeredis.FakeRedis) -> None:
         """Worker delivery places email in recipient inbox."""
         email = send_email(
             r,
@@ -135,7 +121,7 @@ class TestReceiveEmail:
         inbox_ids = r.smembers("email:folder:bob@example.com:inbox")
         assert email.email_id in inbox_ids
 
-    def test_deliver_marks_unread(self, r):
+    def test_deliver_marks_unread(self, r: fakeredis.FakeRedis) -> None:
         """Delivered email should be unread for recipient."""
         email = send_email(
             r,
@@ -149,7 +135,7 @@ class TestReceiveEmail:
         assert fetched is not None
         assert fetched.is_read is False
 
-    def test_deliver_to_multiple_recipients(self, r):
+    def test_deliver_to_multiple_recipients(self, r: fakeredis.FakeRedis) -> None:
         """Email delivered to all TO and CC recipients."""
         email = send_email(
             r,
@@ -164,7 +150,7 @@ class TestReceiveEmail:
         assert email.email_id in r.smembers("email:folder:bob@example.com:inbox")
         assert email.email_id in r.smembers("email:folder:carol@example.com:inbox")
 
-    def test_process_one_delivers(self, r):
+    def test_process_one_delivers(self, r: fakeredis.FakeRedis) -> None:
         """SMTP worker process_one pulls from queue and delivers."""
         send_email(
             r,
@@ -177,7 +163,7 @@ class TestReceiveEmail:
         inbox_ids = r.smembers("email:folder:bob@example.com:inbox")
         assert len(inbox_ids) == 1
 
-    def test_process_one_empty_queue(self, r):
+    def test_process_one_empty_queue(self, r: fakeredis.FakeRedis) -> None:
         """process_one returns False when queue is empty."""
         assert process_one(r) is False
 
@@ -186,7 +172,7 @@ class TestReceiveEmail:
 
 
 class TestReadUnread:
-    def test_mark_as_read(self, r):
+    def test_mark_as_read(self, r: fakeredis.FakeRedis) -> None:
         """Mark email as read."""
         email = send_email(
             r,
@@ -201,7 +187,7 @@ class TestReadUnread:
         assert fetched is not None
         assert fetched.is_read is True
 
-    def test_mark_as_unread(self, r):
+    def test_mark_as_unread(self, r: fakeredis.FakeRedis) -> None:
         """Mark email as unread after reading."""
         email = send_email(
             r,
@@ -216,7 +202,7 @@ class TestReadUnread:
         assert fetched is not None
         assert fetched.is_read is False
 
-    def test_mark_nonexistent_email(self, r):
+    def test_mark_nonexistent_email(self, r: fakeredis.FakeRedis) -> None:
         """Marking a nonexistent email returns False."""
         assert mark_as_read(r, "nonexistent") is False
         assert mark_as_unread(r, "nonexistent") is False
@@ -226,7 +212,7 @@ class TestReadUnread:
 
 
 class TestFolders:
-    def test_default_folders(self, r):
+    def test_default_folders(self, r: fakeredis.FakeRedis) -> None:
         """Users have default folders."""
         folders = ensure_default_folders(r, "alice@example.com")
         assert "inbox" in folders
@@ -234,24 +220,24 @@ class TestFolders:
         assert "drafts" in folders
         assert "trash" in folders
 
-    def test_list_folders(self, r):
+    def test_list_folders(self, r: fakeredis.FakeRedis) -> None:
         """List all folders including custom."""
         ensure_default_folders(r, "alice@example.com")
         folders = list_folders(r, "alice@example.com")
         assert len(folders) >= 4
 
-    def test_create_custom_folder(self, r):
+    def test_create_custom_folder(self, r: fakeredis.FakeRedis) -> None:
         """Create a custom folder."""
         assert create_custom_folder(r, "alice@example.com", "work") is True
         folders = list_folders(r, "alice@example.com")
         assert "work" in folders
 
-    def test_create_duplicate_folder(self, r):
+    def test_create_duplicate_folder(self, r: fakeredis.FakeRedis) -> None:
         """Creating the same custom folder twice returns False."""
         create_custom_folder(r, "alice@example.com", "work")
         assert create_custom_folder(r, "alice@example.com", "work") is False
 
-    def test_move_email_between_folders(self, r):
+    def test_move_email_between_folders(self, r: fakeredis.FakeRedis) -> None:
         """Move email from inbox to trash."""
         email = send_email(
             r,
@@ -271,13 +257,13 @@ class TestFolders:
         assert email.email_id not in inbox_ids
         assert email.email_id in trash_ids
 
-    def test_move_nonexistent_email(self, r):
+    def test_move_nonexistent_email(self, r: fakeredis.FakeRedis) -> None:
         """Moving a nonexistent email returns False."""
         assert move_email(
             r, "bob@example.com", "fake_id", "inbox", "trash"
         ) is False
 
-    def test_delete_moves_to_trash(self, r):
+    def test_delete_moves_to_trash(self, r: fakeredis.FakeRedis) -> None:
         """First delete moves email to Trash."""
         email = send_email(
             r,
@@ -292,7 +278,7 @@ class TestFolders:
         trash_ids = r.smembers("email:folder:bob@example.com:trash")
         assert email.email_id in trash_ids
 
-    def test_delete_from_trash_permanent(self, r):
+    def test_delete_from_trash_permanent(self, r: fakeredis.FakeRedis) -> None:
         """Deleting from Trash is permanent."""
         email = send_email(
             r,
@@ -309,7 +295,7 @@ class TestFolders:
         # Email should be gone
         assert get_email(r, email.email_id) is None
 
-    def test_folder_unread_count(self, r):
+    def test_folder_unread_count(self, r: fakeredis.FakeRedis) -> None:
         """Count unread emails in a folder."""
         e1 = send_email(
             r,
@@ -336,7 +322,7 @@ class TestFolders:
         count = get_folder_unread_count(r, "bob@example.com", "inbox")
         assert count == 1
 
-    def test_get_folder_emails_sorted(self, r):
+    def test_get_folder_emails_sorted(self, r: fakeredis.FakeRedis) -> None:
         """Emails in a folder are sorted newest first."""
         e1 = send_email(
             r,
@@ -365,7 +351,7 @@ class TestFolders:
 
 
 class TestSearch:
-    def test_search_by_subject(self, r):
+    def test_search_by_subject(self, r: fakeredis.FakeRedis) -> None:
         """Search finds email by subject keyword."""
         email = send_email(
             r,
@@ -379,7 +365,7 @@ class TestSearch:
         results = search_emails(r, "bob@example.com", "quarterly")
         assert email.email_id in results
 
-    def test_search_by_body(self, r):
+    def test_search_by_body(self, r: fakeredis.FakeRedis) -> None:
         """Search finds email by body keyword."""
         email = send_email(
             r,
@@ -393,7 +379,7 @@ class TestSearch:
         results = search_emails(r, "bob@example.com", "budget")
         assert email.email_id in results
 
-    def test_search_multi_word_and(self, r):
+    def test_search_multi_word_and(self, r: fakeredis.FakeRedis) -> None:
         """Multi-word search uses AND semantics."""
         email = send_email(
             r,
@@ -412,17 +398,17 @@ class TestSearch:
         results = search_emails(r, "bob@example.com", "project beta")
         assert email.email_id not in results
 
-    def test_search_no_results(self, r):
+    def test_search_no_results(self, r: fakeredis.FakeRedis) -> None:
         """Search with no matching keyword returns empty."""
         results = search_emails(r, "bob@example.com", "nonexistent")
         assert results == []
 
-    def test_search_empty_query(self, r):
+    def test_search_empty_query(self, r: fakeredis.FakeRedis) -> None:
         """Empty query returns empty."""
         results = search_emails(r, "bob@example.com", "")
         assert results == []
 
-    def test_search_case_insensitive(self, r):
+    def test_search_case_insensitive(self, r: fakeredis.FakeRedis) -> None:
         """Search is case-insensitive."""
         email = send_email(
             r,
@@ -441,7 +427,7 @@ class TestSearch:
 
 
 class TestThreading:
-    def test_reply_continues_thread(self, r):
+    def test_reply_continues_thread(self, r: fakeredis.FakeRedis) -> None:
         """Replying to an email continues the same thread."""
         original = send_email(
             r,
@@ -461,7 +447,7 @@ class TestThreading:
         assert reply.thread_id == original.thread_id
         assert reply.in_reply_to == original.email_id
 
-    def test_get_thread_ordered(self, r):
+    def test_get_thread_ordered(self, r: fakeredis.FakeRedis) -> None:
         """get_thread returns emails in chronological order."""
         e1 = send_email(
             r,
@@ -483,7 +469,7 @@ class TestThreading:
         assert thread[0].email_id == e1.email_id
         assert thread[1].email_id == e2.email_id
 
-    def test_new_email_new_thread(self, r):
+    def test_new_email_new_thread(self, r: fakeredis.FakeRedis) -> None:
         """Emails without in_reply_to get distinct thread_ids."""
         e1 = send_email(
             r,
@@ -506,7 +492,7 @@ class TestThreading:
 
 
 class TestAttachments:
-    def test_send_with_attachment(self, r):
+    def test_send_with_attachment(self, r: fakeredis.FakeRedis) -> None:
         """Send email with attachment metadata."""
         att = Attachment(
             filename="report.pdf",
@@ -524,7 +510,7 @@ class TestAttachments:
         assert len(email.attachments) == 1
         assert email.attachments[0].filename == "report.pdf"
 
-    def test_get_attachment(self, r):
+    def test_get_attachment(self, r: fakeredis.FakeRedis) -> None:
         """Retrieve attachment metadata by ID."""
         att = Attachment(
             filename="image.png",
@@ -544,11 +530,11 @@ class TestAttachments:
         assert fetched.filename == "image.png"
         assert fetched.size == 2048
 
-    def test_get_nonexistent_attachment(self, r):
+    def test_get_nonexistent_attachment(self, r: fakeredis.FakeRedis) -> None:
         """Getting a nonexistent attachment returns None."""
         assert get_attachment(r, "fake", "fake") is None
 
-    def test_multiple_attachments(self, r):
+    def test_multiple_attachments(self, r: fakeredis.FakeRedis) -> None:
         """Send email with multiple attachments."""
         atts = [
             Attachment(filename="a.txt", content_type="text/plain", size=100),
@@ -572,7 +558,7 @@ class TestAttachments:
 
 
 class TestIntegration:
-    def test_full_cycle(self, r):
+    def test_full_cycle(self, r: fakeredis.FakeRedis) -> None:
         """Full cycle: send -> worker deliver -> recipient reads."""
         # Alice sends to Bob
         email = send_email(
@@ -602,7 +588,7 @@ class TestIntegration:
         results = search_emails(r, "bob@example.com", "integration")
         assert email.email_id in results
 
-    def test_full_thread_cycle(self, r):
+    def test_full_thread_cycle(self, r: fakeredis.FakeRedis) -> None:
         """Full thread: send -> deliver -> reply -> deliver -> check thread."""
         # Alice sends to Bob
         e1 = send_email(

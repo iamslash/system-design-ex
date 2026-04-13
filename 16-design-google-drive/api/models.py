@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 
 
 class FileMetadata(BaseModel):
-    """파일 메타데이터 응답 모델."""
+    """Response model for file metadata."""
 
     file_id: str
     filename: str
@@ -18,7 +18,7 @@ class FileMetadata(BaseModel):
 
 
 class UploadResponse(BaseModel):
-    """파일 업로드 응답 모델."""
+    """Response model for file upload."""
 
     file_id: str
     filename: str
@@ -31,7 +31,7 @@ class UploadResponse(BaseModel):
 
 
 class VersionInfo(BaseModel):
-    """파일 버전 정보 모델."""
+    """Model for file version information."""
 
     version: int
     size: int
@@ -40,7 +40,7 @@ class VersionInfo(BaseModel):
 
 
 class SyncEvent(BaseModel):
-    """파일 변경 이벤트 모델."""
+    """Model for file change events."""
 
     event_type: str
     file_id: str
@@ -51,7 +51,7 @@ class SyncEvent(BaseModel):
 
 
 class ConflictResponse(BaseModel):
-    """동기화 충돌 응답 모델."""
+    """Response model for sync conflicts."""
 
     conflict: bool = True
     file_id: str

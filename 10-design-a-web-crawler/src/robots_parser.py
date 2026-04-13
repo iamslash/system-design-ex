@@ -1,8 +1,8 @@
 """robots.txt parser and access checker.
 
-urllib.robotparser 를 사용하여 robots.txt 를 파싱하고,
-특정 URL 에 대한 크롤링 허용 여부를 판단한다.
-도메인별로 robots.txt 를 캐싱하여 중복 요청을 방지한다.
+Uses urllib.robotparser to parse robots.txt and determine
+whether crawling is allowed for a given URL.
+Caches robots.txt per domain to avoid redundant requests.
 """
 
 from __future__ import annotations
@@ -16,8 +16,8 @@ import requests
 class RobotsChecker:
     """robots.txt parser with per-domain caching.
 
-    크롤러가 방문하려는 URL 이 robots.txt 에 의해 차단되는지 확인한다.
-    한 번 가져온 robots.txt 는 메모리에 캐싱하여 재사용한다.
+    Checks whether the URL a crawler wants to visit is blocked by robots.txt.
+    Once fetched, robots.txt is cached in memory for reuse.
     """
 
     DEFAULT_USER_AGENT = "SystemDesignCrawler"
@@ -30,32 +30,32 @@ class RobotsChecker:
         """Initialize robots checker.
 
         Args:
-            user_agent: 크롤러의 User-Agent 이름.
-            timeout: robots.txt 다운로드 타임아웃 (초).
+            user_agent: The crawler's User-Agent name.
+            timeout: Timeout in seconds for downloading robots.txt.
         """
         self._user_agent = user_agent
         self._timeout = timeout
         self._cache: dict[str, urllib.robotparser.RobotFileParser] = {}
 
     def is_allowed(self, url: str) -> bool:
-        """URL 에 대한 크롤링이 robots.txt 에 의해 허용되는지 확인한다.
+        """Check whether crawling the URL is allowed by robots.txt.
 
-        robots.txt 를 가져올 수 없는 경우 (네트워크 오류 등)
-        보수적으로 허용(True)을 반환한다.
+        If robots.txt cannot be fetched (network error, etc.),
+        conservatively returns True (allow).
 
         Args:
-            url: 확인할 URL.
+            url: The URL to check.
 
         Returns:
-            True: 크롤링 허용, False: 차단됨.
+            True: crawling allowed, False: blocked.
         """
         parser = self._get_parser(url)
         if parser is None:
-            return True  # robots.txt 를 가져올 수 없으면 허용
+            return True  # Allow if robots.txt cannot be fetched
         return parser.can_fetch(self._user_agent, url)
 
     def _get_parser(self, url: str) -> urllib.robotparser.RobotFileParser | None:
-        """도메인의 robots.txt parser 를 캐시에서 가져오거나 새로 생성한다."""
+        """Retrieve the robots.txt parser for the domain from cache, or create a new one."""
         robots_url = self._robots_url(url)
         if robots_url in self._cache:
             return self._cache[robots_url]
@@ -67,9 +67,9 @@ class RobotsChecker:
     def _fetch_robots(
         self, robots_url: str
     ) -> urllib.robotparser.RobotFileParser | None:
-        """robots.txt 를 다운로드하고 파싱한다.
+        """Download and parse robots.txt.
 
-        네트워크 오류 발생 시 None 을 반환한다.
+        Returns None on network errors.
         """
         rp = urllib.robotparser.RobotFileParser()
         rp.set_url(robots_url)
@@ -79,11 +79,11 @@ class RobotsChecker:
                 rp.parse(resp.text.splitlines())
                 return rp
             elif resp.status_code in (401, 403):
-                # 접근 금지: 모든 URL 차단으로 간주
+                # Access forbidden: treat as blocking all URLs
                 rp.parse(["User-agent: *", "Disallow: /"])
                 return rp
             else:
-                # 404 등: robots.txt 없음 → 모두 허용
+                # 404 etc.: no robots.txt -> allow all
                 return None
         except (requests.RequestException, OSError):
             return None
@@ -98,6 +98,6 @@ class RobotsChecker:
 
     @staticmethod
     def _robots_url(url: str) -> str:
-        """URL 에서 robots.txt URL 을 생성한다."""
+        """Build the robots.txt URL from a given URL."""
         parsed = urlparse(url)
         return f"{parsed.scheme}://{parsed.netloc}/robots.txt"

@@ -11,7 +11,7 @@ from node.store.engine import StorageEngine
 
 
 @pytest.fixture()
-def data_dir():
+def data_dir() -> str:
     with tempfile.TemporaryDirectory() as d:
         yield d
 

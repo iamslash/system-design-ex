@@ -8,7 +8,7 @@ def make_order(order_id: str, side: Side, price: float, qty: float) -> Order:
     return Order(order_id=order_id, symbol="AAPL", side=side, price=price, quantity=qty)
 
 
-def test_add_and_best_bid_ask():
+def test_add_and_best_bid_ask() -> None:
     """Adding orders should update best bid and ask."""
     book = OrderBook("AAPL")
     book.add_order(make_order("B1", Side.BUY, 100.0, 100))
@@ -18,7 +18,7 @@ def test_add_and_best_bid_ask():
     assert book.best_ask() == 101.0
 
 
-def test_cancel_order():
+def test_cancel_order() -> None:
     """Cancelled order should be removed from the book."""
     book = OrderBook("AAPL")
     book.add_order(make_order("B1", Side.BUY, 100.0, 100))
@@ -30,13 +30,13 @@ def test_cancel_order():
     assert book.best_bid() == 99.0
 
 
-def test_cancel_nonexistent():
+def test_cancel_nonexistent() -> None:
     """Cancelling a non-existent order should return None."""
     book = OrderBook("AAPL")
     assert book.cancel_order("NOPE") is None
 
 
-def test_duplicate_order_id():
+def test_duplicate_order_id() -> None:
     """Adding duplicate order_id should raise ValueError."""
     book = OrderBook("AAPL")
     book.add_order(make_order("B1", Side.BUY, 100.0, 100))
@@ -44,7 +44,7 @@ def test_duplicate_order_id():
         book.add_order(make_order("B1", Side.BUY, 100.0, 50))
 
 
-def test_pop_best_buy_order():
+def test_pop_best_buy_order() -> None:
     """pop_best_buy_order should return oldest order at best bid (FIFO)."""
     book = OrderBook("AAPL")
     book.add_order(make_order("B1", Side.BUY, 100.0, 100))
@@ -57,7 +57,7 @@ def test_pop_best_buy_order():
     assert popped2.order_id == "B2"
 
 
-def test_pop_best_sell_order():
+def test_pop_best_sell_order() -> None:
     """pop_best_sell_order should return oldest order at best ask (FIFO)."""
     book = OrderBook("AAPL")
     book.add_order(make_order("S1", Side.SELL, 101.0, 100))
@@ -67,7 +67,7 @@ def test_pop_best_sell_order():
     assert popped.order_id == "S1"
 
 
-def test_l1_data():
+def test_l1_data() -> None:
     """L1 data should show best bid, best ask, and spread."""
     book = OrderBook("AAPL")
     book.add_order(make_order("B1", Side.BUY, 100.0, 500))
@@ -80,7 +80,7 @@ def test_l1_data():
     assert l1["spread"] == pytest.approx(0.5)
 
 
-def test_l2_data():
+def test_l2_data() -> None:
     """L2 data should show multiple price levels per side."""
     book = OrderBook("AAPL")
     book.add_order(make_order("B1", Side.BUY, 100.0, 500))
@@ -97,7 +97,7 @@ def test_l2_data():
     assert l2["asks"][0]["price"] == 101.0
 
 
-def test_reduce_order_quantity():
+def test_reduce_order_quantity() -> None:
     """Partial fill should reduce order quantity; full fill should remove it."""
     book = OrderBook("AAPL")
     book.add_order(make_order("B1", Side.BUY, 100.0, 500))
@@ -112,7 +112,7 @@ def test_reduce_order_quantity():
     assert book.order_count == 0
 
 
-def test_empty_book():
+def test_empty_book() -> None:
     """Empty book should have None for best bid/ask."""
     book = OrderBook("AAPL")
     assert book.best_bid() is None

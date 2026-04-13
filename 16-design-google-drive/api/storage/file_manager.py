@@ -1,7 +1,7 @@
 """File manager for upload and download operations.
 
-업로드 시 파일을 블록으로 분할 → 각 블록 저장(dedup) → 메타데이터 저장.
-다운로드 시 메타데이터에서 블록 해시 목록 조회 → 블록 재조립 → 파일 반환.
+On upload: split file into blocks -> store each block (dedup) -> save metadata.
+On download: retrieve block hash list from metadata -> reassemble blocks -> return file.
 """
 
 from __future__ import annotations
@@ -26,24 +26,24 @@ async def upload_file(
     user_id: str,
     storage_path: str | None = None,
 ) -> dict[str, Any]:
-    """파일을 업로드한다.
+    """Upload a file.
 
-    처리 흐름:
-      1. 파일을 블록으로 분할
-      2. 각 블록을 저장 (dedup — 동일 해시의 블록은 건너뜀)
-      3. 새 버전 생성 (블록 해시 목록 저장)
-      4. 파일 메타데이터 갱신
-      5. 동기화 이벤트 발행
+    Processing flow:
+      1. Split file into blocks
+      2. Store each block (dedup — skip blocks with duplicate hashes)
+      3. Create new version (store block hash list)
+      4. Update file metadata
+      5. Publish sync event
 
     Returns:
-        업로드 결과 (file_id, version, new/reused block 수 등)
+        Upload result (file_id, version, new/reused block counts, etc.)
     """
     now = datetime.now(timezone.utc).isoformat()
 
-    # 1. 파일을 블록으로 분할
+    # 1. Split file into blocks
     blocks = split_into_blocks(data)
 
-    # 2. 각 블록 저장 (dedup 적용)
+    # 2. Store each block (dedup applied)
     block_hashes: list[str] = []
     new_blocks = 0
     reused_blocks = 0
@@ -55,11 +55,11 @@ async def upload_file(
         else:
             reused_blocks += 1
 
-    # 3. 파일 ID 결정 (기존 파일이면 기존 ID 사용)
+    # 3. Determine file ID (reuse existing ID if file already exists)
     file_id = await _find_file_id(redis, filename, user_id)
     if file_id is None:
         file_id = str(uuid.uuid4())
-        # 사용자 파일 목록에 추가
+        # Add to user's file list
         await redis.sadd(f"user_files:{user_id}", file_id)
         version = 1
         await redis.hset(
@@ -75,7 +75,7 @@ async def upload_file(
             },
         )
     else:
-        # 기존 파일: 버전 증가
+        # Existing file: increment version
         version = int(await redis.hget(f"file:{file_id}", "latest_version") or "0") + 1
         await redis.hset(
             f"file:{file_id}",
@@ -86,10 +86,10 @@ async def upload_file(
             },
         )
 
-    # 4. 버전 정보 저장
+    # 4. Save version info
     await create_version(redis, file_id, version, block_hashes, len(data))
 
-    # 5. 동기화 이벤트 발행
+    # 5. Publish sync event
     await publish_sync_event(redis, user_id, {
         "event_type": "upload",
         "file_id": file_id,
@@ -118,42 +118,42 @@ async def download_file(
     version: int | None = None,
     storage_path: str | None = None,
 ) -> tuple[str, bytes]:
-    """파일을 다운로드한다.
+    """Download a file.
 
-    메타데이터에서 블록 해시 목록을 조회하고, 각 블록을 읽어
-    원본 파일로 재조립한다.
+    Retrieves the block hash list from metadata and reads each block
+    to reassemble the original file.
 
     Args:
-        redis: Redis 클라이언트
-        file_id: 파일 ID
-        version: 다운로드할 버전 (None 이면 최신 버전)
-        storage_path: 블록 저장 경로
+        redis: Redis client
+        file_id: File ID
+        version: Version to download (None means latest version)
+        storage_path: Block storage path
 
     Returns:
-        (filename, file_data) 튜플
+        (filename, file_data) tuple
 
     Raises:
-        ValueError: 파일 또는 버전이 없을 때
+        ValueError: When the file or version is not found
     """
-    # 파일 메타데이터 조회
+    # Retrieve file metadata
     file_meta = await redis.hgetall(f"file:{file_id}")
     if not file_meta:
         raise ValueError(f"File not found: {file_id}")
 
     filename = file_meta["filename"]
 
-    # 버전 결정
+    # Determine version
     if version is None:
         version = int(file_meta["latest_version"])
 
-    # 버전의 블록 해시 목록 조회
+    # Retrieve block hash list for the version
     version_data = await get_version(redis, file_id, version)
     if version_data is None:
         raise ValueError(f"Version {version} not found for file {file_id}")
 
     block_hashes = json.loads(version_data["block_hashes"])
 
-    # 블록을 순서대로 읽어 재조립
+    # Read blocks in order and reassemble
     chunks: list[bytes] = []
     for block_hash in block_hashes:
         chunk = await load_block(block_hash, storage_path)
@@ -166,10 +166,10 @@ async def delete_file(
     redis: Redis,
     file_id: str,
 ) -> dict[str, Any]:
-    """파일을 삭제한다 (메타데이터만 삭제, 블록은 유지).
+    """Delete a file (metadata only; blocks are retained).
 
-    블록은 다른 파일에서도 참조될 수 있으므로 삭제하지 않는다.
-    가비지 컬렉션은 별도 배치 작업으로 수행한다.
+    Blocks are not deleted because other files may reference them.
+    Garbage collection is performed as a separate batch job.
     """
     file_meta = await redis.hgetall(f"file:{file_id}")
     if not file_meta:
@@ -179,17 +179,17 @@ async def delete_file(
     filename = file_meta["filename"]
     latest_version = int(file_meta["latest_version"])
 
-    # 모든 버전 메타데이터 삭제
+    # Delete all version metadata
     for v in range(1, latest_version + 1):
         await redis.delete(f"file_version:{file_id}:{v}")
 
-    # 파일 메타데이터 삭제
+    # Delete file metadata
     await redis.delete(f"file:{file_id}")
 
-    # 사용자 파일 목록에서 제거
+    # Remove from user's file list
     await redis.srem(f"user_files:{user_id}", file_id)
 
-    # 동기화 이벤트 발행
+    # Publish sync event
     now = datetime.now(timezone.utc).isoformat()
     await publish_sync_event(redis, user_id, {
         "event_type": "delete",
@@ -211,7 +211,7 @@ async def list_files(
     redis: Redis,
     user_id: str,
 ) -> list[dict[str, Any]]:
-    """사용자의 파일 목록을 조회한다."""
+    """List files belonging to the user."""
     file_ids = await redis.smembers(f"user_files:{user_id}")
     files: list[dict[str, Any]] = []
     for fid in sorted(file_ids):
@@ -222,7 +222,7 @@ async def list_files(
 
 
 async def _find_file_id(redis: Redis, filename: str, user_id: str) -> str | None:
-    """사용자의 기존 파일 중 같은 이름의 파일 ID 를 찾는다."""
+    """Find the file ID of an existing file with the same name for the user."""
     file_ids = await redis.smembers(f"user_files:{user_id}")
     for fid in file_ids:
         stored_name = await redis.hget(f"file:{fid}", "filename")

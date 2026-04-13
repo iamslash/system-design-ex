@@ -8,6 +8,7 @@ Each node exposes:
 from __future__ import annotations
 
 import logging
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import Any
 
@@ -45,7 +46,7 @@ _vector_clocks: dict[str, VectorClock] = {}
 # Lifespan
 # ---------------------------------------------------------------------------
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     global engine, ring, quorum, gossip
 
     logger.info("Node %s starting – cluster: %s", config.node_id, config.cluster_nodes)
@@ -104,7 +105,7 @@ class GossipPayload(BaseModel):
 # Public API (client-facing, coordinator role)
 # ---------------------------------------------------------------------------
 @app.get("/health")
-async def health():
+async def health() -> dict:
     return {
         "node_id": config.node_id,
         "status": "ok",
@@ -113,7 +114,7 @@ async def health():
 
 
 @app.put("/store/{key}")
-async def put_key(key: str, body: PutRequest):
+async def put_key(key: str, body: PutRequest) -> dict:
     replicas = ring.get_replica_nodes(key, config.replication_factor)
     if not replicas:
         raise HTTPException(status_code=503, detail="No nodes available")
@@ -128,7 +129,7 @@ async def put_key(key: str, body: PutRequest):
 
 
 @app.get("/store/{key}")
-async def get_key(key: str):
+async def get_key(key: str) -> dict:
     replicas = ring.get_replica_nodes(key, config.replication_factor)
     if not replicas:
         raise HTTPException(status_code=503, detail="No nodes available")
@@ -140,7 +141,7 @@ async def get_key(key: str):
 
 
 @app.delete("/store/{key}")
-async def delete_key(key: str):
+async def delete_key(key: str) -> dict:
     replicas = ring.get_replica_nodes(key, config.replication_factor)
     if not replicas:
         raise HTTPException(status_code=503, detail="No nodes available")
@@ -152,12 +153,12 @@ async def delete_key(key: str):
 
 
 @app.get("/store")
-async def list_keys():
+async def list_keys() -> dict:
     return {"node_id": config.node_id, "keys": engine.keys()}
 
 
 @app.get("/cluster/info")
-async def cluster_info():
+async def cluster_info() -> dict:
     return {
         "node_id": config.node_id,
         "ring": ring.ring_info(),
@@ -174,7 +175,7 @@ async def cluster_info():
 # Internal API (node-to-node, used by quorum controller)
 # ---------------------------------------------------------------------------
 @app.put("/internal/store/{key}")
-async def internal_put(key: str, body: InternalPutRequest):
+async def internal_put(key: str, body: InternalPutRequest) -> dict:
     """Replica-level PUT — store the value locally."""
     vc = VectorClock.from_dict(body.vector_clock)
     ts = engine.put(key, body.value)
@@ -183,7 +184,7 @@ async def internal_put(key: str, body: InternalPutRequest):
 
 
 @app.get("/internal/store/{key}")
-async def internal_get(key: str):
+async def internal_get(key: str) -> dict:
     """Replica-level GET — return local value + vector clock."""
     stored = engine.get(key)
     if stored is None:
@@ -199,7 +200,7 @@ async def internal_get(key: str):
 
 
 @app.delete("/internal/store/{key}")
-async def internal_delete(key: str):
+async def internal_delete(key: str) -> dict:
     """Replica-level DELETE — tombstone locally."""
     ts = engine.delete(key)
     _vector_clocks.pop(key, None)
@@ -207,7 +208,7 @@ async def internal_delete(key: str):
 
 
 @app.post("/internal/gossip")
-async def internal_gossip(payload: GossipPayload):
+async def internal_gossip(payload: GossipPayload) -> dict:
     """Receive gossip heartbeat from a peer."""
     gossip.receive_gossip(payload.from_node, payload.members)
     return {"ok": True}

@@ -13,7 +13,7 @@ docker-compose up --build
 ## 테스트
 
 ```bash
-pip install fastapi uvicorn redis fakeredis pytest pytest-asyncio python-multipart
+pip install -r api/requirements.txt
 pytest tests/ -v
 ```
 

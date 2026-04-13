@@ -1,7 +1,7 @@
 """HTML parser and link extractor.
 
-BeautifulSoup 을 사용하여 HTML 에서 링크를 추출하고,
-상대 URL 을 절대 URL 로 변환한다.
+Uses BeautifulSoup to extract links from HTML and
+convert relative URLs to absolute URLs.
 """
 
 from __future__ import annotations
@@ -12,14 +12,14 @@ from bs4 import BeautifulSoup
 
 
 def extract_links(html: str, base_url: str) -> list[str]:
-    """HTML 에서 모든 <a href="..."> 링크를 추출한다.
+    """Extract all <a href="..."> links from HTML.
 
     Args:
-        html: HTML 문자열.
-        base_url: 상대 URL 을 절대 URL 로 변환하기 위한 기준 URL.
+        html: HTML string.
+        base_url: Base URL used to resolve relative URLs to absolute URLs.
 
     Returns:
-        정규화된 절대 URL 목록 (중복 제거, HTTP/HTTPS 만 포함).
+        A list of normalized absolute URLs (deduplicated, HTTP/HTTPS only).
     """
     soup = BeautifulSoup(html, "html.parser")
     urls: list[str] = []
@@ -27,23 +27,23 @@ def extract_links(html: str, base_url: str) -> list[str]:
     for anchor in soup.find_all("a", href=True):
         href: str = anchor["href"].strip()
 
-        # fragment-only 링크 (#section) 무시
+        # Ignore fragment-only links (#section)
         if href.startswith("#"):
             continue
 
-        # javascript:, mailto:, tel: 등 비-HTTP 스킴 무시
+        # Ignore non-HTTP schemes: javascript:, mailto:, tel:, data:, etc.
         if href.startswith(("javascript:", "mailto:", "tel:", "data:")):
             continue
 
-        # 상대 URL → 절대 URL 변환
+        # Convert relative URL to absolute URL
         absolute = urljoin(base_url, href)
 
-        # URL 정규화
+        # Normalize URL
         normalized = _normalize_url(absolute)
         if normalized and _is_valid_http(normalized):
             urls.append(normalized)
 
-    # 중복 제거 (순서 유지)
+    # Deduplicate while preserving order
     seen: set[str] = set()
     unique: list[str] = []
     for u in urls:
@@ -55,10 +55,10 @@ def extract_links(html: str, base_url: str) -> list[str]:
 
 
 def extract_title(html: str) -> str:
-    """HTML 에서 <title> 태그 내용을 추출한다.
+    """Extract the content of the <title> tag from HTML.
 
     Returns:
-        페이지 제목 문자열, 없으면 빈 문자열.
+        The page title string, or an empty string if absent.
     """
     soup = BeautifulSoup(html, "html.parser")
     title_tag = soup.find("title")
@@ -68,29 +68,29 @@ def extract_title(html: str) -> str:
 
 
 def _normalize_url(url: str) -> str | None:
-    """URL 정규화: fragment 제거, trailing slash 통일.
+    """Normalize a URL: remove fragment, unify trailing slash.
 
     Returns:
-        정규화된 URL 또는 파싱 실패 시 None.
+        The normalized URL, or None if parsing fails.
     """
     try:
         parsed = urlparse(url)
     except ValueError:
         return None
 
-    # 스킴과 호스트가 없으면 무효
+    # Invalid if scheme or host is missing
     if not parsed.scheme or not parsed.netloc:
         return None
 
-    # fragment 제거, path 정규화
+    # Remove fragment, normalize path
     path = parsed.path or "/"
-    # 빈 path 를 "/" 로 변환
+    # Convert empty path to "/"
     normalized = parsed._replace(fragment="", path=path)
     return normalized.geturl()
 
 
 def _is_valid_http(url: str) -> bool:
-    """URL 이 HTTP 또는 HTTPS 스킴인지 확인한다."""
+    """Check whether the URL uses the HTTP or HTTPS scheme."""
     try:
         parsed = urlparse(url)
         return parsed.scheme in ("http", "https")

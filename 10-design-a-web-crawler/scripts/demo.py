@@ -51,7 +51,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def print_result(idx: int, result: CrawlResult) -> None:
-    """크롤링 결과 한 줄 출력."""
+    """Print a single crawl result on one line."""
     status = f"{result.status_code}" if result.status_code else "ERR"
     dup = " [DUP]" if result.content_duplicate else ""
     err = f" ({result.error})" if result.error else ""
@@ -105,7 +105,7 @@ def main() -> None:
         print()
         return
 
-    # 결과 출력
+    # Print results
     for idx, result in enumerate(results, 1):
         print_result(idx, result)
 
@@ -127,7 +127,7 @@ def main() -> None:
 
     print()
 
-    # 크롤링된 URL 목록
+    # List of crawled URLs
     successful = [r for r in results if r.status_code == 200 and not r.error]
     if successful:
         print("=" * 70)

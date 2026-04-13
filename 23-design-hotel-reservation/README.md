@@ -371,6 +371,13 @@ python scripts/cli.py reserve --reservation-id res-001 --hotel-id h1 --room-type
 python scripts/cli.py cancel --reservation-id res-001
 ```
 
+## 테스트 실행
+
+```bash
+pip install -r api/requirements.txt
+pytest tests/ -v
+```
+
 ## 환경 변수
 
 | 변수 | 기본값 | 설명 |

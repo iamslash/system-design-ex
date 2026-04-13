@@ -1,11 +1,16 @@
-"""Shared fixtures for rate limiter tests."""
+"""Shared fixtures for notification system tests."""
 
 from __future__ import annotations
 
+import os
+import sys
 from typing import AsyncGenerator
 
 import pytest_asyncio
 import fakeredis.aioredis
+
+# Add the api directory to the path so we can import modules.
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "api"))
 
 
 @pytest_asyncio.fixture

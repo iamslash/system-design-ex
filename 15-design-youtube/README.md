@@ -736,7 +736,7 @@ Health: 200
 
 ```bash
 # 의존성 설치
-pip install fakeredis pytest pytest-asyncio
+pip install -r api/requirements.txt
 
 # 테스트 실행
 python -m pytest tests/ -v

@@ -1,22 +1,22 @@
 """Video metadata storage in Redis.
 
-비디오 메타데이터를 Redis Hash 에 저장하고 관리한다.
-각 비디오는 video:{video_id} 키에 해시 형태로 저장된다.
+Stores and manages video metadata in Redis Hashes.
+Each video is stored as a hash at key video:{video_id}.
 
-Redis 데이터 구조:
+Redis data structure:
   video:{video_id} (Hash)
-    - video_id: 비디오 고유 ID
-    - title: 비디오 제목
-    - description: 비디오 설명
+    - video_id: unique video ID
+    - title: video title
+    - description: video description
     - status: uploading | transcoding | ready
-    - resolutions: 사용 가능한 해상도 (쉼표 구분)
-    - created_at: 생성 시간
-    - views: 조회수
-    - thumbnail: 썸네일 경로
+    - resolutions: available resolutions (comma-separated)
+    - created_at: creation timestamp
+    - views: view count
+    - thumbnail: thumbnail path
 
   video_list (Sorted Set)
     - member = video_id, score = created_at
-    - 최신 비디오 목록 조회에 사용
+    - used to retrieve the latest video list
 """
 
 from __future__ import annotations
@@ -33,16 +33,16 @@ async def create_video_metadata(
     title: str,
     description: str = "",
 ) -> dict[str, Any]:
-    """비디오 메타데이터를 생성한다.
+    """Create video metadata.
 
     Args:
-        redis: Redis 클라이언트
-        video_id: 비디오 ID
-        title: 비디오 제목
-        description: 비디오 설명
+        redis: Redis client
+        video_id: Video ID
+        title: Video title
+        description: Video description
 
     Returns:
-        생성된 메타데이터
+        Created metadata
     """
     created_at = time.time()
     video_key = f"video:{video_id}"
@@ -60,7 +60,7 @@ async def create_video_metadata(
 
     await redis.hset(video_key, mapping=metadata)
 
-    # 비디오 목록 Sorted Set 에 추가 (score = created_at)
+    # Add to video list Sorted Set (score = created_at)
     await redis.zadd("video_list", {video_id: created_at})
 
     return {
@@ -77,16 +77,16 @@ async def get_video_metadata(
     redis: Redis,
     video_id: str,
 ) -> dict[str, Any] | None:
-    """비디오 메타데이터를 조회한다.
+    """Retrieve video metadata.
 
-    조회 시 views 를 1 증가시킨다 (조회수 카운트).
+    Increments views by 1 on each retrieval (view count tracking).
 
     Args:
-        redis: Redis 클라이언트
-        video_id: 비디오 ID
+        redis: Redis client
+        video_id: Video ID
 
     Returns:
-        비디오 메타데이터, 없으면 None
+        Video metadata, or None if not found
     """
     video_key = f"video:{video_id}"
     data = await redis.hgetall(video_key)
@@ -94,7 +94,7 @@ async def get_video_metadata(
     if not data:
         return None
 
-    # 조회수 증가
+    # Increment view count
     await redis.hincrby(video_key, "views", 1)
 
     resolutions = data.get("resolutions", "")
@@ -107,7 +107,7 @@ async def get_video_metadata(
         "status": data.get("status", "unknown"),
         "resolutions": resolution_list,
         "created_at": data.get("created_at", ""),
-        "views": int(data.get("views", "0")) + 1,  # 방금 증가한 값 반영
+        "views": int(data.get("views", "0")) + 1,  # reflect the just-incremented value
         "thumbnail": data.get("thumbnail", ""),
     }
 
@@ -118,16 +118,16 @@ async def update_video_status(
     status: str,
     **extra_fields: str,
 ) -> bool:
-    """비디오 상태를 갱신한다.
+    """Update video status.
 
     Args:
-        redis: Redis 클라이언트
-        video_id: 비디오 ID
-        status: 새 상태 (uploading, transcoding, ready)
-        **extra_fields: 추가 필드
+        redis: Redis client
+        video_id: Video ID
+        status: New status (uploading, transcoding, ready)
+        **extra_fields: Additional fields
 
     Returns:
-        갱신 성공 여부
+        True if update succeeded, False otherwise
     """
     video_key = f"video:{video_id}"
     exists = await redis.exists(video_key)
@@ -145,25 +145,25 @@ async def list_videos(
     offset: int = 0,
     limit: int = 20,
 ) -> list[dict[str, Any]]:
-    """비디오 목록을 최신순으로 조회한다.
+    """Retrieve video list in reverse chronological order.
 
-    video_list Sorted Set 에서 역시간순으로 video_id 목록을 가져온 뒤,
-    각 비디오의 메타데이터를 파이프라인으로 일괄 조회한다.
+    Fetches video_id list from the video_list Sorted Set in reverse time order,
+    then batch-retrieves each video's metadata using a pipeline.
 
     Args:
-        redis: Redis 클라이언트
-        offset: 시작 위치
-        limit: 조회 개수
+        redis: Redis client
+        offset: Start position
+        limit: Number of results to retrieve
 
     Returns:
-        비디오 메타데이터 목록
+        List of video metadata
     """
     video_ids = await redis.zrevrange("video_list", offset, offset + limit - 1)
 
     if not video_ids:
         return []
 
-    # 파이프라인으로 일괄 조회
+    # Batch retrieve using pipeline
     pipe = redis.pipeline()
     for vid in video_ids:
         pipe.hgetall(f"video:{vid}")
@@ -193,14 +193,14 @@ async def delete_video_metadata(
     redis: Redis,
     video_id: str,
 ) -> bool:
-    """비디오 메타데이터를 삭제한다.
+    """Delete video metadata.
 
     Args:
-        redis: Redis 클라이언트
-        video_id: 비디오 ID
+        redis: Redis client
+        video_id: Video ID
 
     Returns:
-        삭제 성공 여부
+        True if deletion succeeded, False otherwise
     """
     video_key = f"video:{video_id}"
     deleted = await redis.delete(video_key)

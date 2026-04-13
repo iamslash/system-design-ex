@@ -1,7 +1,7 @@
 """FastAPI notification server entry point.
 
-알림 시스템의 HTTP API 를 제공하며, 백그라운드로 워커(consumer)를 실행한다.
-Redis 를 메시지 큐 겸 저장소로 사용한다.
+Provides the HTTP API for the notification system and runs a background
+worker (consumer).  Redis is used as both a message queue and data store.
 """
 
 from __future__ import annotations
@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import Any
 
@@ -34,17 +35,17 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# 전역 Redis 클라이언트 및 워커 태스크
+# Global Redis client and worker task
 redis_client: aioredis.Redis | None = None
 worker_task: asyncio.Task | None = None
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
-    """애플리케이션 시작/종료 시 Redis 연결 및 워커를 관리한다."""
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    """Manage Redis connection and worker on application startup/shutdown."""
     global redis_client, worker_task
 
-    # 시작: Redis 연결 및 워커 실행
+    # Startup: connect to Redis and launch worker
     redis_client = aioredis.Redis(
         host=settings.REDIS_HOST,
         port=settings.REDIS_PORT,
@@ -55,7 +56,7 @@ async def lifespan(app: FastAPI):
 
     yield
 
-    # 종료: 워커 중지 및 Redis 연결 해제
+    # Shutdown: stop worker and close Redis connection
     if worker_task:
         worker_task.cancel()
         try:
@@ -75,7 +76,7 @@ app = FastAPI(
 
 
 def _get_redis() -> aioredis.Redis:
-    """Redis 클라이언트를 반환한다. 연결되지 않았으면 503 을 발생시킨다."""
+    """Return the Redis client, raising 503 if not connected."""
     if redis_client is None:
         raise HTTPException(status_code=503, detail="Redis not connected")
     return redis_client
@@ -110,7 +111,7 @@ async def health() -> dict[str, Any]:
 
 @app.post("/api/v1/notify")
 async def notify(request: NotificationRequest) -> dict[str, Any]:
-    """알림을 전송한다."""
+    """Send a notification."""
     r = _get_redis()
     result = await dispatch_notification(r, request)
     return result
@@ -118,7 +119,7 @@ async def notify(request: NotificationRequest) -> dict[str, Any]:
 
 @app.post("/api/v1/notify/batch")
 async def notify_batch(request: BatchNotificationRequest) -> dict[str, Any]:
-    """여러 사용자에게 동시에 알림을 전송한다."""
+    """Send notifications to multiple users simultaneously."""
     r = _get_redis()
     results = []
     for user_id in request.user_ids:
@@ -139,7 +140,7 @@ async def notify_batch(request: BatchNotificationRequest) -> dict[str, Any]:
 
 @app.get("/api/v1/notifications/{user_id}")
 async def get_notification_history(user_id: str) -> dict[str, Any]:
-    """사용자의 알림 히스토리를 조회한다."""
+    """Retrieve notification history for a user."""
     r = _get_redis()
     notification_ids = await r.lrange(f"user_notifications:{user_id}", 0, 49)
     notifications = []
@@ -156,7 +157,7 @@ async def get_notification_history(user_id: str) -> dict[str, Any]:
 
 @app.get("/api/v1/notifications/{notification_id}/status")
 async def get_notification_status(notification_id: str) -> dict[str, Any]:
-    """특정 알림의 상태를 조회한다."""
+    """Retrieve the status of a specific notification."""
     r = _get_redis()
     data = await r.hgetall(f"notification:{notification_id}")
     if not data:
@@ -171,7 +172,7 @@ async def get_notification_status(notification_id: str) -> dict[str, Any]:
 
 @app.get("/api/v1/settings/{user_id}")
 async def get_settings(user_id: str) -> dict[str, Any]:
-    """사용자 알림 설정을 조회한다."""
+    """Retrieve notification preferences for a user."""
     r = _get_redis()
     prefs = await get_user_preferences(r, user_id)
     return {
@@ -182,7 +183,7 @@ async def get_settings(user_id: str) -> dict[str, Any]:
 
 @app.put("/api/v1/settings/{user_id}")
 async def update_settings(user_id: str, prefs: UserPreferences) -> dict[str, Any]:
-    """사용자 알림 설정을 갱신한다."""
+    """Update notification preferences for a user."""
     r = _get_redis()
     await save_user_preferences(r, user_id, prefs)
     return {

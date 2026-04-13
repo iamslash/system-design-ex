@@ -16,10 +16,11 @@ import time
 
 
 class IdGenerator:
-    """시간 기반 정렬 가능한 고유 메시지 ID 생성기.
+    """Time-based sortable unique message ID generator.
 
-    Snowflake 방식과 유사하게 밀리초 타임스탬프 + 시퀀스 카운터로 구성된다.
-    같은 밀리초 내에서도 시퀀스 번호로 고유성을 보장한다.
+    Composed of a millisecond timestamp and a sequence counter, similar to
+    the Snowflake approach. Uniqueness within the same millisecond is
+    guaranteed by the sequence number.
     """
 
     def __init__(self) -> None:
@@ -28,24 +29,24 @@ class IdGenerator:
         self._sequence: int = 0
 
     def generate(self) -> str:
-        """고유하고 시간순 정렬 가능한 메시지 ID 를 생성한다.
+        """Generate a unique, time-sortable message ID.
 
         Returns:
-            "{timestamp_ms}-{sequence}" 형태의 문자열 ID.
+            A string ID in the form "{timestamp_ms}-{sequence}".
         """
         with self._lock:
             now_ms = int(time.time() * 1000)
 
             if now_ms == self._last_timestamp_ms:
-                # 같은 밀리초 내에서 시퀀스 증가
+                # Increment sequence within the same millisecond
                 self._sequence += 1
             else:
-                # 새로운 밀리초이므로 시퀀스 초기화
+                # New millisecond, reset sequence
                 self._last_timestamp_ms = now_ms
                 self._sequence = 0
 
             return f"{now_ms}-{self._sequence}"
 
 
-# 싱글톤 인스턴스
+# Singleton instance
 id_generator = IdGenerator()

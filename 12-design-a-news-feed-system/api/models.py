@@ -6,24 +6,24 @@ from pydantic import BaseModel
 
 
 class CreatePostRequest(BaseModel):
-    """포스트 작성 요청."""
+    """Request to create a post."""
     user_id: str
     content: str
 
 
 class FollowRequest(BaseModel):
-    """팔로우 요청."""
+    """Request to follow a user."""
     follower_id: str
     followee_id: str
 
 
 class UnfollowRequest(BaseModel):
-    """언팔로우 요청."""
+    """Request to unfollow a user."""
     follower_id: str
     followee_id: str
 
 
 class CreateUserRequest(BaseModel):
-    """사용자 생성 요청."""
+    """Request to create a user."""
     user_id: str
     name: str

@@ -346,7 +346,7 @@ def generate_with_collision_resolution(url, exists_fn, use_md5=False):
 
 ```bash
 cd 09-design-a-url-shortener
-pip install fakeredis pytest pytest-asyncio fastapi pydantic redis
+pip install -r api/requirements.txt
 pytest tests/ -v
 ```
 

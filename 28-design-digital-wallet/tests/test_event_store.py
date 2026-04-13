@@ -3,7 +3,7 @@
 from src.event_store import EventStore, EventType
 
 
-def test_append_and_retrieve():
+def test_append_and_retrieve() -> None:
     """Appended events should be retrievable."""
     store = EventStore()
     event = store.append(EventType.WALLET_CREATED, "w1", {"wallet_id": "w1", "owner": "alice"})
@@ -13,7 +13,7 @@ def test_append_and_retrieve():
     assert len(store) == 1
 
 
-def test_idempotency():
+def test_idempotency() -> None:
     """Same idempotency key should return the original event."""
     store = EventStore()
     first = store.append(
@@ -33,7 +33,7 @@ def test_idempotency():
     assert len(store) == 1
 
 
-def test_get_events_by_aggregate():
+def test_get_events_by_aggregate() -> None:
     """Should filter events by aggregate_id."""
     store = EventStore()
     store.append(EventType.WALLET_CREATED, "w1", {"wallet_id": "w1", "owner": "alice"})
@@ -47,7 +47,7 @@ def test_get_events_by_aggregate():
     assert len(w2_events) == 1
 
 
-def test_get_events_after_version():
+def test_get_events_after_version() -> None:
     """Should filter events after a specific version."""
     store = EventStore()
     store.append(EventType.WALLET_CREATED, "w1", {"wallet_id": "w1", "owner": "alice"})
@@ -59,7 +59,7 @@ def test_get_events_after_version():
     assert events[0].version == 2
 
 
-def test_event_immutability():
+def test_event_immutability() -> None:
     """Events should be frozen dataclasses."""
     store = EventStore()
     event = store.append(EventType.WALLET_CREATED, "w1", {"wallet_id": "w1", "owner": "alice"})

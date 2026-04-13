@@ -1,19 +1,19 @@
 """Trie with top-k caching at each node.
 
-각 노드에 top-k 결과를 캐싱하여 O(1) 접두사 검색을 지원하는 Trie 구현.
+Trie implementation that caches top-k results at each node to support O(1) prefix search.
 """
 
 from __future__ import annotations
 
 
 class TrieNode:
-    """Trie 의 개별 노드.
+    """An individual Trie node.
 
     Attributes:
-        children: 자식 노드 맵 (문자 -> TrieNode)
-        is_end: 단어의 끝인지 여부
-        frequency: 이 노드가 단어 끝일 때의 빈도수
-        top_k: 캐싱된 top-k 결과 [(단어, 빈도), ...]
+        children: Map of child nodes (character -> TrieNode)
+        is_end: Whether this node marks the end of a word
+        frequency: Frequency count when this node is a word end
+        top_k: Cached top-k results [(word, frequency), ...]
     """
 
     __slots__ = ("children", "is_end", "frequency", "top_k")
@@ -26,15 +26,15 @@ class TrieNode:
 
 
 class Trie:
-    """Top-k 캐싱을 지원하는 Trie.
+    """Trie with top-k caching support.
 
-    각 노드에 해당 접두사로 시작하는 단어 중 빈도가 가장 높은 k 개를
-    캐싱한다. 검색 시 노드의 top_k 를 바로 반환하므로 O(p) 시간에
-    결과를 얻을 수 있다 (p = 접두사 길이).
+    Caches the k most frequent words starting with each prefix at each node.
+    Search returns the node's top_k directly, yielding O(p) time
+    where p is the prefix length.
 
     Args:
-        k: 각 노드에 캐싱할 최대 결과 수 (기본값: 5)
-        max_prefix_length: 접두사 최대 길이 제한 (기본값: 50)
+        k: Maximum number of results to cache at each node (default: 5)
+        max_prefix_length: Maximum prefix length limit (default: 50)
     """
 
     def __init__(self, k: int = 5, max_prefix_length: int = 50) -> None:
@@ -42,26 +42,26 @@ class Trie:
         self.k = k
         self.max_prefix_length = max_prefix_length
         self._word_count = 0
-        self._node_count = 1  # root 노드
+        self._node_count = 1  # root node
 
     @property
     def word_count(self) -> int:
-        """Trie 에 저장된 단어 수."""
+        """Number of words stored in the Trie."""
         return self._word_count
 
     @property
     def node_count(self) -> int:
-        """Trie 의 전체 노드 수."""
+        """Total number of nodes in the Trie."""
         return self._node_count
 
     def insert(self, word: str, frequency: int = 1) -> None:
-        """단어를 삽입하고 경로의 모든 노드에서 top-k 캐시를 갱신한다.
+        """Insert a word and update the top-k cache at every node along the path.
 
-        이미 존재하는 단어인 경우 빈도를 누적한다.
+        If the word already exists, its frequency is accumulated.
 
         Args:
-            word: 삽입할 단어 (소문자로 정규화됨)
-            frequency: 빈도수 (기본값: 1)
+            word: Word to insert (normalized to lowercase)
+            frequency: Frequency count (default: 1)
         """
         if not word:
             return
@@ -69,7 +69,7 @@ class Trie:
         word = word.lower()
         node = self.root
 
-        # 루트 노드의 top-k 도 갱신
+        # Also update top-k for the root node
         self._update_top_k(node, word, frequency)
 
         for char in word:
@@ -77,10 +77,10 @@ class Trie:
                 node.children[char] = TrieNode()
                 self._node_count += 1
             node = node.children[char]
-            # 경로의 각 노드에서 top-k 캐시 갱신
+            # Update top-k cache at each node along the path
             self._update_top_k(node, word, frequency)
 
-        # 단어 끝 노드 설정
+        # Mark the end-of-word node
         if not node.is_end:
             node.is_end = True
             node.frequency = frequency
@@ -89,23 +89,23 @@ class Trie:
             node.frequency += frequency
 
     def search(self, prefix: str) -> list[tuple[str, int]]:
-        """접두사에 대한 top-k 결과를 반환한다.
+        """Return top-k results for a prefix.
 
-        캐싱된 top-k 를 반환하므로 O(p) 시간 (p = 접두사 길이).
-        접두사 길이가 max_prefix_length 를 초과하면 잘라낸다.
+        Returns cached top-k in O(p) time (p = prefix length).
+        Truncates prefix if it exceeds max_prefix_length.
 
         Args:
-            prefix: 검색할 접두사
+            prefix: Prefix to search
 
         Returns:
-            [(단어, 빈도), ...] 빈도 내림차순, 최대 k 개
+            [(word, frequency), ...] in descending frequency order, up to k results
         """
         if not prefix:
             return []
 
         prefix = prefix.lower()
 
-        # 최적화 1: 접두사 길이 제한
+        # Optimization 1: limit prefix length
         if len(prefix) > self.max_prefix_length:
             prefix = prefix[: self.max_prefix_length]
 
@@ -115,60 +115,60 @@ class Trie:
                 return []
             node = node.children[char]
 
-        # 최적화 2: 캐싱된 top-k 바로 반환
+        # Optimization 2: return cached top-k directly
         return list(node.top_k)
 
     def _update_top_k(self, node: TrieNode, word: str, frequency: int) -> None:
-        """노드의 top-k 캐시를 갱신한다.
+        """Update the top-k cache at a node.
 
-        기존에 같은 단어가 있으면 빈도를 누적하고, 없으면 추가한 뒤
-        빈도 내림차순으로 정렬하여 상위 k 개만 유지한다.
+        If the same word already exists, accumulate frequency; otherwise add it,
+        then sort by descending frequency and keep only the top k.
 
         Args:
-            node: 갱신할 노드
-            word: 단어
-            frequency: 추가할 빈도수
+            node: Node to update
+            word: Word
+            frequency: Frequency to add
         """
-        # 기존 항목 확인
+        # Check existing entries
         for i, (w, f) in enumerate(node.top_k):
             if w == word:
                 node.top_k[i] = (w, f + frequency)
-                # 빈도 내림차순 정렬
+                # Sort by descending frequency
                 node.top_k.sort(key=lambda x: (-x[1], x[0]))
                 return
 
-        # 새 항목 추가
+        # Add new entry
         node.top_k.append((word, frequency))
         node.top_k.sort(key=lambda x: (-x[1], x[0]))
 
-        # k 개 초과 시 잘라내기
+        # Trim if exceeding k
         if len(node.top_k) > self.k:
             node.top_k = node.top_k[: self.k]
 
     def build_from_frequency_table(self, freq_table: dict[str, int]) -> None:
-        """빈도 테이블에서 Trie 를 구축한다.
+        """Build the Trie from a frequency table.
 
         Args:
-            freq_table: {단어: 빈도수} 딕셔너리
+            freq_table: {word: frequency} dictionary
         """
         for word, freq in freq_table.items():
             self.insert(word, freq)
 
     def delete(self, word: str) -> bool:
-        """단어를 삭제하고 경로의 top-k 캐시에서도 제거한다.
+        """Delete a word and remove it from the top-k cache along the path.
 
         Args:
-            word: 삭제할 단어
+            word: Word to delete
 
         Returns:
-            삭제 성공 여부
+            True if deletion succeeded, False otherwise
         """
         if not word:
             return False
 
         word = word.lower()
 
-        # 경로의 노드들을 수집
+        # Collect nodes along the path
         path: list[TrieNode] = [self.root]
         node = self.root
         for char in word:
@@ -177,22 +177,22 @@ class Trie:
             node = node.children[char]
             path.append(node)
 
-        # 단어 끝이 아니면 삭제할 것이 없음
+        # Nothing to delete if not a word end
         if not node.is_end:
             return False
 
-        # 단어 끝 플래그 해제
+        # Clear the end-of-word flag
         node.is_end = False
         node.frequency = 0
         self._word_count -= 1
 
-        # 경로의 모든 노드에서 top-k 캐시에서 해당 단어 제거
+        # Remove the word from top-k cache at every node along the path
         for path_node in path:
             path_node.top_k = [
                 (w, f) for w, f in path_node.top_k if w != word
             ]
 
-        # 불필요한 노드 정리 (리프 노드부터 역순으로)
+        # Clean up unnecessary nodes (reverse order from leaf)
         for i in range(len(word) - 1, -1, -1):
             char = word[i]
             parent = path[i]

@@ -331,6 +331,13 @@ python scripts/cli.py rules
 python scripts/cli.py --health
 ```
 
+## 테스트 실행
+
+```bash
+pip install -r api/requirements.txt
+pytest tests/ -v
+```
+
 ## 환경 변수
 
 | 변수 | 기본값 | 설명 |

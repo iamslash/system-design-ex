@@ -1,8 +1,8 @@
 """Social graph — follow/unfollow and follower/following queries.
 
-Redis 데이터 구조:
-  following:{user_id} — SET: 이 사용자가 팔로우하는 사용자 ID 집합
-  followers:{user_id} — SET: 이 사용자를 팔로우하는 사용자 ID 집합
+Redis data structures:
+  following:{user_id} — SET: set of user IDs this user follows
+  followers:{user_id} — SET: set of user IDs that follow this user
 """
 
 from __future__ import annotations
@@ -13,16 +13,16 @@ from redis.asyncio import Redis
 
 
 async def follow(redis: Redis, follower_id: str, followee_id: str) -> dict[str, Any]:
-    """follower_id 가 followee_id 를 팔로우한다.
+    """follower_id follows followee_id.
 
-    양방향으로 Redis Set 을 갱신한다:
-      - following:{follower_id} 에 followee_id 추가
-      - followers:{followee_id} 에 follower_id 추가
+    Updates Redis Sets bidirectionally:
+      - Adds followee_id to following:{follower_id}
+      - Adds follower_id to followers:{followee_id}
     """
     if follower_id == followee_id:
         return {"status": "error", "message": "Cannot follow yourself"}
 
-    # 이미 팔로우 중인지 확인
+    # Check if already following
     already = await redis.sismember(f"following:{follower_id}", followee_id)
     if already:
         return {"status": "already_following", "message": f"{follower_id} already follows {followee_id}"}
@@ -36,11 +36,11 @@ async def follow(redis: Redis, follower_id: str, followee_id: str) -> dict[str, 
 
 
 async def unfollow(redis: Redis, follower_id: str, followee_id: str) -> dict[str, Any]:
-    """follower_id 가 followee_id 를 언팔로우한다.
+    """follower_id unfollows followee_id.
 
-    양방향으로 Redis Set 을 갱신한다:
-      - following:{follower_id} 에서 followee_id 제거
-      - followers:{followee_id} 에서 follower_id 제거
+    Updates Redis Sets bidirectionally:
+      - Removes followee_id from following:{follower_id}
+      - Removes follower_id from followers:{followee_id}
     """
     removed = await redis.srem(f"following:{follower_id}", followee_id)
     if not removed:
@@ -52,12 +52,12 @@ async def unfollow(redis: Redis, follower_id: str, followee_id: str) -> dict[str
 
 
 async def get_followers(redis: Redis, user_id: str) -> list[str]:
-    """user_id 를 팔로우하는 사용자 목록을 반환한다."""
+    """Return the list of users who follow user_id."""
     members = await redis.smembers(f"followers:{user_id}")
     return sorted(members)
 
 
 async def get_following(redis: Redis, user_id: str) -> list[str]:
-    """user_id 가 팔로우하는 사용자 목록을 반환한다."""
+    """Return the list of users that user_id follows."""
     members = await redis.smembers(f"following:{user_id}")
     return sorted(members)

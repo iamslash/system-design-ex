@@ -1,27 +1,27 @@
 """Base62 encode/decode for URL shortening.
 
-62진법 문자(0-9, a-z, A-Z)를 사용하여 정수 ID 를 짧은 문자열로 변환한다.
-62^7 = 3,521,614,606,208 (약 3.5조) 개의 고유 코드를 생성할 수 있다.
+Converts an integer ID to a short string using Base62 characters (0-9, a-z, A-Z).
+62^7 = 3,521,614,606,208 (about 3.5 trillion) unique codes can be generated.
 """
 
 from __future__ import annotations
 
-# 62개 문자: 숫자(10) + 소문자(26) + 대문자(26)
+# 62 characters: digits (10) + lowercase (26) + uppercase (26)
 CHARSET = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 BASE = len(CHARSET)  # 62
 
 
 def encode(num: int) -> str:
-    """정수를 Base62 문자열로 인코딩한다.
+    """Encode an integer as a Base62 string.
 
     Args:
-        num: 0 이상의 정수.
+        num: A non-negative integer.
 
     Returns:
-        Base62 인코딩된 문자열.
+        Base62-encoded string.
 
     Raises:
-        ValueError: num 이 음수일 때.
+        ValueError: When num is negative.
 
     Examples:
         >>> encode(0)
@@ -37,7 +37,7 @@ def encode(num: int) -> str:
     if num == 0:
         return CHARSET[0]
 
-    # 나머지를 역순으로 모아서 문자열 생성
+    # Collect remainders in reverse order to build the string
     chars: list[str] = []
     while num > 0:
         num, remainder = divmod(num, BASE)
@@ -47,16 +47,16 @@ def encode(num: int) -> str:
 
 
 def decode(s: str) -> int:
-    """Base62 문자열을 정수로 디코딩한다.
+    """Decode a Base62 string to an integer.
 
     Args:
-        s: Base62 인코딩된 문자열.
+        s: A Base62-encoded string.
 
     Returns:
-        디코딩된 정수.
+        The decoded integer.
 
     Raises:
-        ValueError: 유효하지 않은 문자가 포함되었을 때.
+        ValueError: When the string contains an invalid character.
 
     Examples:
         >>> decode('0')

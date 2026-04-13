@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import sys
 
+import fakeredis.aioredis
 import pytest
 
 # Add the api directory to the path so we can import modules.
@@ -193,7 +194,7 @@ class TestMetadataStoreBucket:
     """Tests for bucket metadata operations."""
 
     @pytest.mark.asyncio
-    async def test_create_bucket(self, redis_client) -> None:
+    async def test_create_bucket(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """Creating a bucket should return its info."""
         meta = MetadataStore(redis_client)
         info = await meta.create_bucket("test-bucket")
@@ -201,7 +202,7 @@ class TestMetadataStoreBucket:
         assert info["versioning_enabled"] is False
 
     @pytest.mark.asyncio
-    async def test_create_duplicate_bucket_raises(self, redis_client) -> None:
+    async def test_create_duplicate_bucket_raises(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """Creating a bucket that already exists should raise ValueError."""
         meta = MetadataStore(redis_client)
         await meta.create_bucket("dup")
@@ -209,7 +210,7 @@ class TestMetadataStoreBucket:
             await meta.create_bucket("dup")
 
     @pytest.mark.asyncio
-    async def test_get_bucket(self, redis_client) -> None:
+    async def test_get_bucket(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """get_bucket should return the bucket info."""
         meta = MetadataStore(redis_client)
         await meta.create_bucket("mybucket")
@@ -218,13 +219,13 @@ class TestMetadataStoreBucket:
         assert info["bucket_name"] == "mybucket"
 
     @pytest.mark.asyncio
-    async def test_get_nonexistent_bucket(self, redis_client) -> None:
+    async def test_get_nonexistent_bucket(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """get_bucket for unknown name should return None."""
         meta = MetadataStore(redis_client)
         assert await meta.get_bucket("nope") is None
 
     @pytest.mark.asyncio
-    async def test_delete_bucket(self, redis_client) -> None:
+    async def test_delete_bucket(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """delete_bucket should remove the bucket."""
         meta = MetadataStore(redis_client)
         await meta.create_bucket("del-me")
@@ -232,7 +233,7 @@ class TestMetadataStoreBucket:
         assert await meta.get_bucket("del-me") is None
 
     @pytest.mark.asyncio
-    async def test_delete_nonempty_bucket_raises(self, redis_client) -> None:
+    async def test_delete_nonempty_bucket_raises(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """Deleting a non-empty bucket should raise ValueError."""
         meta = MetadataStore(redis_client)
         await meta.create_bucket("notempty")
@@ -241,7 +242,7 @@ class TestMetadataStoreBucket:
             await meta.delete_bucket("notempty")
 
     @pytest.mark.asyncio
-    async def test_list_buckets(self, redis_client) -> None:
+    async def test_list_buckets(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """list_buckets should return all bucket names sorted."""
         meta = MetadataStore(redis_client)
         await meta.create_bucket("beta")
@@ -250,7 +251,7 @@ class TestMetadataStoreBucket:
         assert names == ["alpha", "beta"]
 
     @pytest.mark.asyncio
-    async def test_set_versioning(self, redis_client) -> None:
+    async def test_set_versioning(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """set_versioning should toggle the versioning flag."""
         meta = MetadataStore(redis_client)
         await meta.create_bucket("vbucket")
@@ -271,7 +272,7 @@ class TestObjectService:
     """Tests for ObjectService (upload, download, delete, list)."""
 
     @pytest.mark.asyncio
-    async def test_put_and_get_object(self, redis_client, tmp_data_dir) -> None:
+    async def test_put_and_get_object(self, redis_client: fakeredis.aioredis.FakeRedis, tmp_data_dir: str) -> None:
         """Upload then download should return the same data."""
         meta = MetadataStore(redis_client)
         ds = DataStore(data_dir=tmp_data_dir)
@@ -288,7 +289,7 @@ class TestObjectService:
         assert data == b"Hello World"
 
     @pytest.mark.asyncio
-    async def test_get_nonexistent_object(self, redis_client, tmp_data_dir) -> None:
+    async def test_get_nonexistent_object(self, redis_client: fakeredis.aioredis.FakeRedis, tmp_data_dir: str) -> None:
         """Getting a non-existent object should return None."""
         meta = MetadataStore(redis_client)
         ds = DataStore(data_dir=tmp_data_dir)
@@ -298,7 +299,7 @@ class TestObjectService:
 
     @pytest.mark.asyncio
     async def test_delete_object_without_versioning(
-        self, redis_client, tmp_data_dir
+        self, redis_client: fakeredis.aioredis.FakeRedis, tmp_data_dir: str
     ) -> None:
         """Delete without versioning should hard-delete the object."""
         meta = MetadataStore(redis_client)
@@ -312,7 +313,7 @@ class TestObjectService:
         assert await svc.get_object("b1", "file.txt") is None
 
     @pytest.mark.asyncio
-    async def test_overwrite_object(self, redis_client, tmp_data_dir) -> None:
+    async def test_overwrite_object(self, redis_client: fakeredis.aioredis.FakeRedis, tmp_data_dir: str) -> None:
         """Uploading the same key should overwrite without versioning."""
         meta = MetadataStore(redis_client)
         ds = DataStore(data_dir=tmp_data_dir)
@@ -337,7 +338,7 @@ class TestObjectListing:
     """Tests for listing objects with prefix filter."""
 
     @pytest.mark.asyncio
-    async def test_list_objects_all(self, redis_client, tmp_data_dir) -> None:
+    async def test_list_objects_all(self, redis_client: fakeredis.aioredis.FakeRedis, tmp_data_dir: str) -> None:
         """list_objects without prefix should return all objects."""
         meta = MetadataStore(redis_client)
         ds = DataStore(data_dir=tmp_data_dir)
@@ -353,7 +354,7 @@ class TestObjectListing:
 
     @pytest.mark.asyncio
     async def test_list_objects_with_prefix(
-        self, redis_client, tmp_data_dir
+        self, redis_client: fakeredis.aioredis.FakeRedis, tmp_data_dir: str
     ) -> None:
         """list_objects with prefix should filter correctly."""
         meta = MetadataStore(redis_client)
@@ -372,7 +373,7 @@ class TestObjectListing:
 
     @pytest.mark.asyncio
     async def test_list_objects_empty_result(
-        self, redis_client, tmp_data_dir
+        self, redis_client: fakeredis.aioredis.FakeRedis, tmp_data_dir: str
     ) -> None:
         """list_objects with non-matching prefix should return empty."""
         meta = MetadataStore(redis_client)
@@ -395,7 +396,7 @@ class TestVersioning:
 
     @pytest.mark.asyncio
     async def test_versioning_multiple_versions(
-        self, redis_client, tmp_data_dir
+        self, redis_client: fakeredis.aioredis.FakeRedis, tmp_data_dir: str
     ) -> None:
         """With versioning enabled, multiple uploads create multiple versions."""
         meta = MetadataStore(redis_client)
@@ -417,7 +418,7 @@ class TestVersioning:
 
     @pytest.mark.asyncio
     async def test_versioning_get_specific_version(
-        self, redis_client, tmp_data_dir
+        self, redis_client: fakeredis.aioredis.FakeRedis, tmp_data_dir: str
     ) -> None:
         """Should be able to download a specific version by version_id."""
         meta = MetadataStore(redis_client)
@@ -445,7 +446,7 @@ class TestVersioning:
 
     @pytest.mark.asyncio
     async def test_versioning_delete_marker(
-        self, redis_client, tmp_data_dir
+        self, redis_client: fakeredis.aioredis.FakeRedis, tmp_data_dir: str
     ) -> None:
         """Deleting with versioning should create a delete marker."""
         meta = MetadataStore(redis_client)
@@ -471,7 +472,7 @@ class TestVersioning:
 
     @pytest.mark.asyncio
     async def test_versioning_delete_marker_in_version_list(
-        self, redis_client, tmp_data_dir
+        self, redis_client: fakeredis.aioredis.FakeRedis, tmp_data_dir: str
     ) -> None:
         """Delete markers should appear in version listings."""
         meta = MetadataStore(redis_client)
@@ -492,7 +493,7 @@ class TestVersioning:
 
     @pytest.mark.asyncio
     async def test_versioning_list_excludes_deleted(
-        self, redis_client, tmp_data_dir
+        self, redis_client: fakeredis.aioredis.FakeRedis, tmp_data_dir: str
     ) -> None:
         """list_objects should not include objects with delete markers as current."""
         meta = MetadataStore(redis_client)
@@ -521,7 +522,7 @@ class TestBucketService:
     """Integration tests for BucketService."""
 
     @pytest.mark.asyncio
-    async def test_create_and_list(self, redis_client) -> None:
+    async def test_create_and_list(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """Creating buckets and listing should work end-to-end."""
         meta = MetadataStore(redis_client)
         svc = BucketService(meta)
@@ -535,7 +536,7 @@ class TestBucketService:
         assert "bucket-b" in names
 
     @pytest.mark.asyncio
-    async def test_delete_bucket(self, redis_client) -> None:
+    async def test_delete_bucket(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """Deleting a bucket should remove it from the list."""
         meta = MetadataStore(redis_client)
         svc = BucketService(meta)
@@ -546,7 +547,7 @@ class TestBucketService:
         assert len(buckets) == 0
 
     @pytest.mark.asyncio
-    async def test_get_bucket_with_count(self, redis_client) -> None:
+    async def test_get_bucket_with_count(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """get_bucket should include the object count."""
         meta = MetadataStore(redis_client)
         svc = BucketService(meta)

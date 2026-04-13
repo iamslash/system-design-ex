@@ -1,6 +1,6 @@
 """File and user metadata store backed by Redis.
 
-Redis 에 파일 메타데이터, 사용자 파일 목록 등을 저장하고 조회한다.
+Stores and retrieves file metadata, user file lists, and related data in Redis.
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ async def get_file_metadata(
     redis: Redis,
     file_id: str,
 ) -> dict[str, Any] | None:
-    """파일 메타데이터를 조회한다.
+    """Retrieve file metadata.
 
     Redis key: file:{file_id}
     Fields: file_id, filename, user_id, latest_version, size, created_at, updated_at
@@ -28,7 +28,7 @@ async def get_user_file_ids(
     redis: Redis,
     user_id: str,
 ) -> set[str]:
-    """사용자의 파일 ID 목록을 조회한다.
+    """Retrieve the set of file IDs belonging to a user.
 
     Redis key: user_files:{user_id} (Set)
     """
@@ -39,7 +39,7 @@ async def get_block_info(
     redis: Redis,
     block_hash: str,
 ) -> dict[str, Any] | None:
-    """블록 메타데이터를 조회한다.
+    """Retrieve block metadata.
 
     Redis key: block:{hash}
     Fields: original_size, compressed_size

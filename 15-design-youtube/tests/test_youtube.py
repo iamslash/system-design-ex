@@ -1,20 +1,22 @@
 """Tests for the video streaming system.
 
-fakeredis 를 사용하여 Redis 의존성 없이 단위 테스트를 수행한다.
-임시 디렉토리를 사용하여 파일시스템 테스트를 격리한다.
+Uses fakeredis for unit tests without a Redis dependency.
+Uses temporary directories to isolate filesystem tests.
 """
 
 from __future__ import annotations
 
 import os
+import pathlib
 import sys
 import tempfile
+from collections.abc import AsyncGenerator
 
 import fakeredis.aioredis
 import pytest
 import pytest_asyncio
 
-# api 디렉토리를 import 경로에 추가
+# Add api directory to import path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "api"))
 
 import config
@@ -53,7 +55,7 @@ from video.upload import (
 
 
 @pytest_asyncio.fixture
-async def redis_client():
+async def redis_client() -> AsyncGenerator[fakeredis.aioredis.FakeRedis, None]:
     """Create a fake async Redis client for testing."""
     client = fakeredis.aioredis.FakeRedis(decode_responses=True)
     yield client
@@ -62,7 +64,7 @@ async def redis_client():
 
 
 @pytest.fixture
-def temp_storage(tmp_path, monkeypatch):
+def temp_storage(tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch) -> str:
     """Set up a temporary video storage directory."""
     storage_path = str(tmp_path / "videos")
     os.makedirs(storage_path, exist_ok=True)
@@ -84,13 +86,13 @@ def _create_sample_video(path: str, content: str = "sample video content") -> st
 
 
 class TestUploadInitiation:
-    """업로드 시작 테스트."""
+    """Upload initiation tests."""
 
     @pytest.mark.asyncio
     async def test_initiate_upload_returns_upload_id(
-        self, redis_client, temp_storage
+        self, redis_client: fakeredis.aioredis.FakeRedis, temp_storage: str
     ) -> None:
-        """업로드 시작 시 upload_id 를 반환한다."""
+        """Initiating an upload should return an upload_id."""
         result = await initiate_upload(redis_client, "Test Video", "desc", 3)
         assert "upload_id" in result
         assert "video_id" in result
@@ -99,18 +101,18 @@ class TestUploadInitiation:
 
     @pytest.mark.asyncio
     async def test_initiate_upload_creates_presigned_url(
-        self, redis_client, temp_storage
+        self, redis_client: fakeredis.aioredis.FakeRedis, temp_storage: str
     ) -> None:
-        """업로드 시작 시 pre-signed URL (시뮬레이션)을 반환한다."""
+        """Initiating an upload should return a pre-signed URL (simulated)."""
         result = await initiate_upload(redis_client, "Test Video", "", 1)
         assert "presigned_url" in result
         assert result["upload_id"] in result["presigned_url"]
 
     @pytest.mark.asyncio
     async def test_upload_status_saved_in_redis(
-        self, redis_client, temp_storage
+        self, redis_client: fakeredis.aioredis.FakeRedis, temp_storage: str
     ) -> None:
-        """업로드 상태가 Redis 에 저장된다."""
+        """Upload status should be saved in Redis."""
         result = await initiate_upload(redis_client, "My Video", "desc", 2)
         upload_id = result["upload_id"]
 
@@ -123,13 +125,13 @@ class TestUploadInitiation:
 
 
 class TestChunkUpload:
-    """청크 업로드 테스트."""
+    """Chunk upload tests."""
 
     @pytest.mark.asyncio
     async def test_chunk_upload_tracking(
-        self, redis_client, temp_storage
+        self, redis_client: fakeredis.aioredis.FakeRedis, temp_storage: str
     ) -> None:
-        """청크 업로드 시 진행률이 추적된다."""
+        """Upload progress should be tracked when uploading chunks."""
         result = await initiate_upload(redis_client, "Video", "", 3)
         upload_id = result["upload_id"]
 
@@ -146,9 +148,9 @@ class TestChunkUpload:
 
     @pytest.mark.asyncio
     async def test_chunk_upload_invalid_index(
-        self, redis_client, temp_storage
+        self, redis_client: fakeredis.aioredis.FakeRedis, temp_storage: str
     ) -> None:
-        """유효하지 않은 청크 인덱스는 에러를 반환한다."""
+        """An invalid chunk index should return an error."""
         result = await initiate_upload(redis_client, "Video", "", 2)
         upload_id = result["upload_id"]
 
@@ -159,9 +161,9 @@ class TestChunkUpload:
 
     @pytest.mark.asyncio
     async def test_chunk_upload_nonexistent_upload(
-        self, redis_client, temp_storage
+        self, redis_client: fakeredis.aioredis.FakeRedis, temp_storage: str
     ) -> None:
-        """존재하지 않는 upload_id 로 청크 업로드 시 에러를 반환한다."""
+        """Uploading a chunk with a non-existent upload_id should return an error."""
         result = await upload_chunk(
             redis_client, "nonexistent", 0, b"data"
         )
@@ -169,27 +171,27 @@ class TestChunkUpload:
 
     @pytest.mark.asyncio
     async def test_resumable_chunk_overwrites(
-        self, redis_client, temp_storage
+        self, redis_client: fakeredis.aioredis.FakeRedis, temp_storage: str
     ) -> None:
-        """동일한 청크 인덱스를 다시 업로드하면 덮어쓴다 (resumable)."""
+        """Re-uploading the same chunk index should overwrite it (resumable)."""
         result = await initiate_upload(redis_client, "Video", "", 2)
         upload_id = result["upload_id"]
 
         await upload_chunk(redis_client, upload_id, 0, b"first-attempt")
         r1 = await upload_chunk(redis_client, upload_id, 0, b"second-attempt")
 
-        # 중복 청크여도 카운트는 1 (Set 사용)
+        # Even duplicate chunks count as 1 (using Set)
         assert r1["uploaded_chunks"] == 1
 
 
 class TestCompleteUpload:
-    """업로드 완료 테스트."""
+    """Upload completion tests."""
 
     @pytest.mark.asyncio
     async def test_complete_upload_merges_chunks(
-        self, redis_client, temp_storage
+        self, redis_client: fakeredis.aioredis.FakeRedis, temp_storage: str
     ) -> None:
-        """업로드 완료 시 청크가 하나의 파일로 병합된다."""
+        """Completing an upload should merge chunks into a single file."""
         result = await initiate_upload(redis_client, "Video", "", 2)
         upload_id = result["upload_id"]
         video_id = result["video_id"]
@@ -201,7 +203,7 @@ class TestCompleteUpload:
         assert "error" not in complete
         assert complete["video_id"] == video_id
 
-        # 병합된 파일 확인
+        # Verify merged file
         merged_path = os.path.join(temp_storage, "originals", f"{video_id}.mp4")
         assert os.path.exists(merged_path)
         with open(merged_path, "rb") as f:
@@ -209,14 +211,14 @@ class TestCompleteUpload:
 
     @pytest.mark.asyncio
     async def test_complete_upload_fails_if_chunks_missing(
-        self, redis_client, temp_storage
+        self, redis_client: fakeredis.aioredis.FakeRedis, temp_storage: str
     ) -> None:
-        """모든 청크가 업로드되지 않으면 완료가 실패한다."""
+        """Completion should fail if not all chunks have been uploaded."""
         result = await initiate_upload(redis_client, "Video", "", 3)
         upload_id = result["upload_id"]
 
         await upload_chunk(redis_client, upload_id, 0, b"data")
-        # chunk 1, 2 는 업로드하지 않음
+        # chunks 1 and 2 are not uploaded
 
         complete = await complete_upload(redis_client, upload_id)
         assert "error" in complete
@@ -224,9 +226,9 @@ class TestCompleteUpload:
 
     @pytest.mark.asyncio
     async def test_complete_upload_triggers_status_change(
-        self, redis_client, temp_storage
+        self, redis_client: fakeredis.aioredis.FakeRedis, temp_storage: str
     ) -> None:
-        """업로드 완료 시 상태가 'completed' 로 변경된다."""
+        """Upload status should change to 'completed' when upload is complete."""
         result = await initiate_upload(redis_client, "Video", "", 1)
         upload_id = result["upload_id"]
 
@@ -243,26 +245,26 @@ class TestCompleteUpload:
 
 
 class TestTranscode:
-    """트랜스코딩 파이프라인 테스트."""
+    """Transcoding pipeline tests."""
 
     @pytest.mark.asyncio
     async def test_transcode_produces_multiple_resolutions(
-        self, redis_client, temp_storage
+        self, redis_client: fakeredis.aioredis.FakeRedis, temp_storage: str
     ) -> None:
-        """트랜스코딩 후 여러 해상도 파일이 생성된다."""
+        """Transcoding should produce files at multiple resolutions."""
         video_id = "test-video-001"
-        # 원본 비디오 파일 생성
+        # Create original video file
         original_path = os.path.join(temp_storage, "originals", f"{video_id}.mp4")
         _create_sample_video(original_path, "original video content here")
 
-        # 비디오 메타데이터 생성
+        # Create video metadata
         await create_video_metadata(redis_client, video_id, "Test")
 
         result = await transcode_video(redis_client, video_id, original_path)
         assert result["status"] == "ready"
         assert set(result["resolutions"]) == {"360p", "720p", "1080p"}
 
-        # 각 해상도 파일이 존재하는지 확인
+        # Verify each resolution file exists
         for res in ["360p", "720p", "1080p"]:
             res_path = os.path.join(
                 temp_storage, "transcoded", video_id, f"{res}.mp4"
@@ -271,9 +273,9 @@ class TestTranscode:
 
     @pytest.mark.asyncio
     async def test_transcode_dag_stages(
-        self, redis_client, temp_storage
+        self, redis_client: fakeredis.aioredis.FakeRedis, temp_storage: str
     ) -> None:
-        """DAG 파이프라인의 모든 단계가 실행된다."""
+        """All stages of the DAG pipeline should be executed."""
         video_id = "test-video-002"
         original_path = os.path.join(temp_storage, "originals", f"{video_id}.mp4")
         _create_sample_video(original_path)
@@ -287,9 +289,9 @@ class TestTranscode:
 
     @pytest.mark.asyncio
     async def test_transcode_updates_video_status(
-        self, redis_client, temp_storage
+        self, redis_client: fakeredis.aioredis.FakeRedis, temp_storage: str
     ) -> None:
-        """트랜스코딩 완료 후 비디오 상태가 'ready' 로 갱신된다."""
+        """Video status should be updated to 'ready' after transcoding completes."""
         video_id = "test-video-003"
         original_path = os.path.join(temp_storage, "originals", f"{video_id}.mp4")
         _create_sample_video(original_path)
@@ -301,8 +303,8 @@ class TestTranscode:
         assert data["status"] == "ready"
         assert "360p" in data["resolutions"]
 
-    def test_dag_split(self, temp_storage) -> None:
-        """Split 단계가 세그먼트를 생성한다."""
+    def test_dag_split(self, temp_storage: str) -> None:
+        """The Split stage should create segments."""
         source = os.path.join(temp_storage, "test_split.mp4")
         _create_sample_video(source, "split test content")
 
@@ -313,8 +315,8 @@ class TestTranscode:
         assert result["segment_count"] == 1
         assert os.path.exists(result["segments"][0])
 
-    def test_dag_encode(self, temp_storage) -> None:
-        """Encode 단계가 지정된 해상도로 인코딩한다."""
+    def test_dag_encode(self, temp_storage: str) -> None:
+        """The Encode stage should encode to the specified resolution."""
         segment_path = os.path.join(temp_storage, "segment.dat")
         _create_sample_video(segment_path, "segment data")
 
@@ -325,8 +327,8 @@ class TestTranscode:
         assert result["resolution"] == "720p"
         assert os.path.exists(result["output_path"])
 
-    def test_dag_thumbnail(self, temp_storage) -> None:
-        """Thumbnail 단계가 썸네일을 생성한다."""
+    def test_dag_thumbnail(self, temp_storage: str) -> None:
+        """The Thumbnail stage should generate a thumbnail."""
         source = os.path.join(temp_storage, "test_thumb.mp4")
         _create_sample_video(source)
 
@@ -343,11 +345,11 @@ class TestTranscode:
 
 
 class TestMetadata:
-    """비디오 메타데이터 테스트."""
+    """Video metadata tests."""
 
     @pytest.mark.asyncio
-    async def test_create_metadata(self, redis_client) -> None:
-        """비디오 메타데이터를 생성할 수 있다."""
+    async def test_create_metadata(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
+        """Should be able to create video metadata."""
         result = await create_video_metadata(
             redis_client, "vid-001", "My Video", "A description"
         )
@@ -356,8 +358,8 @@ class TestMetadata:
         assert result["status"] == "uploading"
 
     @pytest.mark.asyncio
-    async def test_get_metadata(self, redis_client) -> None:
-        """비디오 메타데이터를 조회할 수 있다."""
+    async def test_get_metadata(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
+        """Should be able to retrieve video metadata."""
         await create_video_metadata(redis_client, "vid-002", "Test Video")
         result = await get_video_metadata(redis_client, "vid-002")
 
@@ -366,14 +368,14 @@ class TestMetadata:
         assert result["title"] == "Test Video"
 
     @pytest.mark.asyncio
-    async def test_get_nonexistent_metadata(self, redis_client) -> None:
-        """존재하지 않는 비디오 메타데이터 조회 시 None 을 반환한다."""
+    async def test_get_nonexistent_metadata(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
+        """Retrieving non-existent video metadata should return None."""
         result = await get_video_metadata(redis_client, "nonexistent")
         assert result is None
 
     @pytest.mark.asyncio
-    async def test_views_increment(self, redis_client) -> None:
-        """메타데이터 조회 시 조회수가 증가한다."""
+    async def test_views_increment(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
+        """View count should increment when metadata is retrieved."""
         await create_video_metadata(redis_client, "vid-003", "Popular")
 
         r1 = await get_video_metadata(redis_client, "vid-003")
@@ -383,8 +385,8 @@ class TestMetadata:
         assert r2["views"] == 2
 
     @pytest.mark.asyncio
-    async def test_update_video_status(self, redis_client) -> None:
-        """비디오 상태를 갱신할 수 있다."""
+    async def test_update_video_status(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
+        """Should be able to update video status."""
         await create_video_metadata(redis_client, "vid-004", "Test")
         success = await update_video_status(
             redis_client, "vid-004", "ready", resolutions="360p,720p"
@@ -396,27 +398,27 @@ class TestMetadata:
         assert data["resolutions"] == "360p,720p"
 
     @pytest.mark.asyncio
-    async def test_update_nonexistent_video(self, redis_client) -> None:
-        """존재하지 않는 비디오 상태 갱신은 실패한다."""
+    async def test_update_nonexistent_video(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
+        """Updating status of a non-existent video should fail."""
         success = await update_video_status(redis_client, "ghost", "ready")
         assert success is False
 
     @pytest.mark.asyncio
-    async def test_list_videos(self, redis_client) -> None:
-        """비디오 목록을 최신순으로 조회할 수 있다."""
+    async def test_list_videos(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
+        """Should be able to retrieve video list in reverse chronological order."""
         await create_video_metadata(redis_client, "vid-a", "First")
         await create_video_metadata(redis_client, "vid-b", "Second")
         await create_video_metadata(redis_client, "vid-c", "Third")
 
         videos = await list_videos(redis_client)
         assert len(videos) == 3
-        # 최신 먼저
+        # Most recent first
         titles = [v["title"] for v in videos]
         assert titles[0] == "Third"
 
     @pytest.mark.asyncio
-    async def test_delete_metadata(self, redis_client) -> None:
-        """비디오 메타데이터를 삭제할 수 있다."""
+    async def test_delete_metadata(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
+        """Should be able to delete video metadata."""
         await create_video_metadata(redis_client, "vid-del", "Delete Me")
         deleted = await delete_video_metadata(redis_client, "vid-del")
         assert deleted is True
@@ -425,8 +427,8 @@ class TestMetadata:
         assert result is None
 
     @pytest.mark.asyncio
-    async def test_video_status_lifecycle(self, redis_client) -> None:
-        """비디오 상태가 uploading → transcoding → ready 로 전이된다."""
+    async def test_video_status_lifecycle(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
+        """Video status should transition uploading → transcoding → ready."""
         await create_video_metadata(redis_client, "vid-lc", "Lifecycle")
 
         # uploading
@@ -450,34 +452,34 @@ class TestMetadata:
 
 
 class TestStreaming:
-    """비디오 스트리밍 테스트."""
+    """Video streaming tests."""
 
     def test_parse_range_full(self) -> None:
-        """Range 헤더 없을 때 전체 범위를 반환한다."""
+        """Should return the full range when no Range header is present."""
         start, end = parse_range_header(None, 1000)
         assert start == 0
         assert end == 999
 
     def test_parse_range_bytes(self) -> None:
-        """bytes=0-499 형식을 파싱한다."""
+        """Should parse bytes=0-499 format."""
         start, end = parse_range_header("bytes=0-499", 1000)
         assert start == 0
         assert end == 499
 
     def test_parse_range_open_end(self) -> None:
-        """bytes=500- 형식을 파싱한다 (끝까지)."""
+        """Should parse bytes=500- format (to end of file)."""
         start, end = parse_range_header("bytes=500-", 1000)
         assert start == 500
         assert end == 999
 
     def test_parse_range_suffix(self) -> None:
-        """bytes=-200 형식을 파싱한다 (마지막 200바이트)."""
+        """Should parse bytes=-200 format (last 200 bytes)."""
         start, end = parse_range_header("bytes=-200", 1000)
         assert start == 800
         assert end == 999
 
-    def test_read_video_range(self, temp_storage) -> None:
-        """지정된 바이트 범위의 데이터를 읽는다."""
+    def test_read_video_range(self, temp_storage: str) -> None:
+        """Should read data for the specified byte range."""
         video_path = os.path.join(temp_storage, "range_test.mp4")
         with open(video_path, "wb") as f:
             f.write(b"0123456789ABCDEF")
@@ -485,8 +487,8 @@ class TestStreaming:
         data = read_video_range(video_path, 4, 7)
         assert data == b"4567"
 
-    def test_stream_with_range_header(self, temp_storage) -> None:
-        """Range 헤더가 있으면 206 Partial Content 를 반환한다."""
+    def test_stream_with_range_header(self, temp_storage: str) -> None:
+        """Should return 206 Partial Content when a Range header is present."""
         video_path = os.path.join(temp_storage, "stream_test.mp4")
         with open(video_path, "wb") as f:
             f.write(b"A" * 1000)
@@ -496,8 +498,8 @@ class TestStreaming:
         assert len(info["data"]) == 500
         assert "Content-Range" in info["headers"]
 
-    def test_stream_without_range_header(self, temp_storage) -> None:
-        """Range 헤더가 없으면 200 OK 로 전체 파일을 반환한다."""
+    def test_stream_without_range_header(self, temp_storage: str) -> None:
+        """Should return 200 OK with the full file when no Range header is present."""
         video_path = os.path.join(temp_storage, "stream_full.mp4")
         with open(video_path, "wb") as f:
             f.write(b"B" * 500)
@@ -506,8 +508,8 @@ class TestStreaming:
         assert info["status_code"] == 200
         assert len(info["data"]) == 500
 
-    def test_get_video_path_transcoded(self, temp_storage) -> None:
-        """트랜스코딩된 파일을 우선 반환한다."""
+    def test_get_video_path_transcoded(self, temp_storage: str) -> None:
+        """Should return the transcoded file first."""
         video_id = "path-test"
         transcoded = os.path.join(
             temp_storage, "transcoded", video_id, "720p.mp4"
@@ -519,8 +521,8 @@ class TestStreaming:
         path = get_video_path(video_id, "720p")
         assert path == transcoded
 
-    def test_get_video_path_original_fallback(self, temp_storage) -> None:
-        """트랜스코딩 파일이 없으면 원본 파일로 폴백한다."""
+    def test_get_video_path_original_fallback(self, temp_storage: str) -> None:
+        """Should fall back to the original file when no transcoded file exists."""
         video_id = "fallback-test"
         original = os.path.join(temp_storage, "originals", f"{video_id}.mp4")
         os.makedirs(os.path.dirname(original), exist_ok=True)
@@ -530,8 +532,8 @@ class TestStreaming:
         path = get_video_path(video_id, "720p")
         assert path == original
 
-    def test_get_video_path_not_found(self, temp_storage) -> None:
-        """비디오 파일이 없으면 None 을 반환한다."""
+    def test_get_video_path_not_found(self, temp_storage: str) -> None:
+        """Should return None when the video file does not exist."""
         path = get_video_path("nonexistent", "720p")
         assert path is None
 
@@ -542,46 +544,46 @@ class TestStreaming:
 
 
 class TestIntegration:
-    """업로드부터 스트리밍까지의 통합 테스트."""
+    """Integration tests from upload through streaming."""
 
     @pytest.mark.asyncio
     async def test_full_lifecycle(
-        self, redis_client, temp_storage
+        self, redis_client: fakeredis.aioredis.FakeRedis, temp_storage: str
     ) -> None:
-        """업로드 → 트랜스코딩 → 스트리밍 전체 흐름을 테스트한다."""
-        # 1. 업로드 시작
+        """Test the full flow: upload → transcoding → streaming."""
+        # 1. Initiate upload
         upload = await initiate_upload(redis_client, "Full Test", "desc", 2)
         upload_id = upload["upload_id"]
         video_id = upload["video_id"]
 
-        # 메타데이터 생성
+        # Create metadata
         await create_video_metadata(redis_client, video_id, "Full Test", "desc")
 
-        # 2. 청크 업로드
+        # 2. Upload chunks
         await upload_chunk(redis_client, upload_id, 0, b"chunk-0-content-")
         await upload_chunk(redis_client, upload_id, 1, b"chunk-1-content")
 
-        # 3. 업로드 완료
+        # 3. Complete upload
         complete = await complete_upload(redis_client, upload_id)
         assert "error" not in complete
 
-        # 4. 트랜스코딩
+        # 4. Transcoding
         transcode = await transcode_video(
             redis_client, video_id, complete["file_path"]
         )
         assert transcode["status"] == "ready"
 
-        # 5. 메타데이터 확인
+        # 5. Verify metadata
         meta = await get_video_metadata(redis_client, video_id)
         assert meta is not None
         assert meta["status"] == "ready"
         assert "720p" in meta["resolutions"]
 
-        # 6. 스트리밍 파일 확인
+        # 6. Verify streaming file
         video_path = get_video_path(video_id, "720p")
         assert video_path is not None
 
-        # 7. Range 스트리밍
+        # 7. Range streaming
         stream = build_stream_response_info(video_path, "bytes=0-9")
         assert stream["status_code"] == 206
         assert len(stream["data"]) == 10

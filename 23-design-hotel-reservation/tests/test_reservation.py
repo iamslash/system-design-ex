@@ -6,6 +6,7 @@ import asyncio
 import sys
 import os
 
+import fakeredis.aioredis
 import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "api"))
@@ -33,7 +34,7 @@ class TestHotelService:
     """Tests for hotel and room type CRUD."""
 
     @pytest.mark.asyncio
-    async def test_create_and_get_hotel(self, redis_client) -> None:
+    async def test_create_and_get_hotel(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """Creating a hotel should persist and be retrievable."""
         svc = HotelService(redis_client)
         hotel = await svc.create_hotel(Hotel(name="Grand Hotel", address="123 Main St"))
@@ -44,7 +45,7 @@ class TestHotelService:
         assert fetched.name == "Grand Hotel"
 
     @pytest.mark.asyncio
-    async def test_list_hotels(self, redis_client) -> None:
+    async def test_list_hotels(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """Listing hotels should return all created hotels."""
         svc = HotelService(redis_client)
         await svc.create_hotel(Hotel(name="Hotel A"))
@@ -56,7 +57,7 @@ class TestHotelService:
         assert names == {"Hotel A", "Hotel B"}
 
     @pytest.mark.asyncio
-    async def test_delete_hotel(self, redis_client) -> None:
+    async def test_delete_hotel(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """Deleting a hotel should remove it from storage."""
         svc = HotelService(redis_client)
         hotel = await svc.create_hotel(Hotel(name="Temp Hotel"))
@@ -64,7 +65,7 @@ class TestHotelService:
         assert await svc.get_hotel(hotel.id) is None
 
     @pytest.mark.asyncio
-    async def test_create_room_type(self, redis_client) -> None:
+    async def test_create_room_type(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """Creating a room type should associate it with the hotel."""
         svc = HotelService(redis_client)
         hotel = await svc.create_hotel(Hotel(name="Resort"))
@@ -87,7 +88,7 @@ class TestInventoryService:
     """Tests for room inventory tracking."""
 
     @pytest.mark.asyncio
-    async def test_init_and_get_inventory(self, redis_client) -> None:
+    async def test_init_and_get_inventory(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """Initializing inventory should create a retrievable record."""
         svc = InventoryService(redis_client)
         inv = await svc.init_inventory("h1", "rt1", "2025-07-01", 100)
@@ -100,7 +101,7 @@ class TestInventoryService:
         assert fetched.total_inventory == 100
 
     @pytest.mark.asyncio
-    async def test_reserve_rooms(self, redis_client) -> None:
+    async def test_reserve_rooms(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """Reserving rooms should increment total_reserved."""
         svc = InventoryService(redis_client)
         await svc.init_inventory("h1", "rt1", "2025-07-01", 100)
@@ -110,7 +111,7 @@ class TestInventoryService:
         assert updated.version == 1
 
     @pytest.mark.asyncio
-    async def test_reserve_rooms_exceeds_capacity(self, redis_client) -> None:
+    async def test_reserve_rooms_exceeds_capacity(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """Reserving more than allowed should raise ValueError."""
         svc = InventoryService(redis_client)
         await svc.init_inventory("h1", "rt1", "2025-07-01", 10)
@@ -120,7 +121,7 @@ class TestInventoryService:
             await svc.reserve_rooms("h1", "rt1", "2025-07-01", 12)
 
     @pytest.mark.asyncio
-    async def test_overbooking_within_limit(self, redis_client) -> None:
+    async def test_overbooking_within_limit(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """Reserving up to overbooking ratio (110%) should succeed."""
         svc = InventoryService(redis_client)
         await svc.init_inventory("h1", "rt1", "2025-07-01", 10)
@@ -132,7 +133,7 @@ class TestInventoryService:
         assert updated.total_reserved == 11
 
     @pytest.mark.asyncio
-    async def test_overbooking_exceeds_limit(self, redis_client) -> None:
+    async def test_overbooking_exceeds_limit(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """Reserving beyond overbooking ratio should fail."""
         svc = InventoryService(redis_client)
         await svc.init_inventory("h1", "rt1", "2025-07-01", 10)
@@ -145,7 +146,7 @@ class TestInventoryService:
             await svc.reserve_rooms("h1", "rt1", "2025-07-01", 1)
 
     @pytest.mark.asyncio
-    async def test_release_rooms(self, redis_client) -> None:
+    async def test_release_rooms(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """Releasing rooms should decrement total_reserved."""
         svc = InventoryService(redis_client)
         await svc.init_inventory("h1", "rt1", "2025-07-01", 100)
@@ -155,7 +156,7 @@ class TestInventoryService:
         assert released.total_reserved == 5
 
     @pytest.mark.asyncio
-    async def test_release_rooms_floor_at_zero(self, redis_client) -> None:
+    async def test_release_rooms_floor_at_zero(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """Releasing more rooms than reserved should floor at zero."""
         svc = InventoryService(redis_client)
         await svc.init_inventory("h1", "rt1", "2025-07-01", 100)
@@ -165,14 +166,14 @@ class TestInventoryService:
         assert released.total_reserved == 0
 
     @pytest.mark.asyncio
-    async def test_inventory_not_found(self, redis_client) -> None:
+    async def test_inventory_not_found(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """Reserving on non-existent inventory should raise ValueError."""
         svc = InventoryService(redis_client)
         with pytest.raises(ValueError, match="No inventory"):
             await svc.reserve_rooms("h1", "rt1", "2025-07-01", 1)
 
     @pytest.mark.asyncio
-    async def test_version_increments_on_reserve(self, redis_client) -> None:
+    async def test_version_increments_on_reserve(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """Each reservation should increment the version number."""
         svc = InventoryService(redis_client)
         await svc.init_inventory("h1", "rt1", "2025-07-01", 100)
@@ -183,7 +184,7 @@ class TestInventoryService:
         assert v2.version == 2
 
     @pytest.mark.asyncio
-    async def test_get_inventory_range(self, redis_client) -> None:
+    async def test_get_inventory_range(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """Getting inventory range should return records for multiple dates."""
         svc = InventoryService(redis_client)
         for day in range(1, 4):
@@ -195,7 +196,7 @@ class TestInventoryService:
         assert len(results) == 3
 
     @pytest.mark.asyncio
-    async def test_custom_overbooking_ratio(self, redis_client) -> None:
+    async def test_custom_overbooking_ratio(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """Custom overbooking ratio should be respected."""
         svc = InventoryService(redis_client)
         await svc.init_inventory("h1", "rt1", "2025-07-01", 10)
@@ -214,7 +215,7 @@ class TestInventoryService:
 class TestReservationService:
     """Tests for reservation creation, idempotency, and cancellation."""
 
-    async def _setup(self, redis_client) -> tuple[ReservationService, InventoryService]:
+    async def _setup(self, redis_client: fakeredis.aioredis.FakeRedis) -> tuple[ReservationService, InventoryService]:
         """Helper to set up services with inventory."""
         inv_svc = InventoryService(redis_client)
         res_svc = ReservationService(redis_client, inv_svc)
@@ -224,7 +225,7 @@ class TestReservationService:
         return res_svc, inv_svc
 
     @pytest.mark.asyncio
-    async def test_create_reservation(self, redis_client) -> None:
+    async def test_create_reservation(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """Creating a reservation should persist it and update inventory."""
         res_svc, inv_svc = await self._setup(redis_client)
         req = ReservationRequest(
@@ -247,7 +248,7 @@ class TestReservationService:
         assert inv2.total_reserved == 2
 
     @pytest.mark.asyncio
-    async def test_idempotent_reservation(self, redis_client) -> None:
+    async def test_idempotent_reservation(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """Submitting the same reservation_id twice should return the same result
         without double-booking inventory."""
         res_svc, inv_svc = await self._setup(redis_client)
@@ -272,7 +273,7 @@ class TestReservationService:
         assert inv.total_reserved == 3
 
     @pytest.mark.asyncio
-    async def test_cancel_reservation(self, redis_client) -> None:
+    async def test_cancel_reservation(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """Cancelling should set status to CANCELLED and release inventory."""
         res_svc, inv_svc = await self._setup(redis_client)
         req = ReservationRequest(
@@ -294,14 +295,14 @@ class TestReservationService:
         assert inv.total_reserved == 0
 
     @pytest.mark.asyncio
-    async def test_cancel_nonexistent_reservation(self, redis_client) -> None:
+    async def test_cancel_nonexistent_reservation(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """Cancelling a non-existent reservation should raise ValueError."""
         res_svc, _ = await self._setup(redis_client)
         with pytest.raises(ValueError, match="not found"):
             await res_svc.cancel_reservation("res-nonexistent")
 
     @pytest.mark.asyncio
-    async def test_get_reservation(self, redis_client) -> None:
+    async def test_get_reservation(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """Getting a reservation by ID should return the correct record."""
         res_svc, _ = await self._setup(redis_client)
         req = ReservationRequest(
@@ -318,7 +319,7 @@ class TestReservationService:
         assert fetched.guest_name == "Diana"
 
     @pytest.mark.asyncio
-    async def test_list_reservations(self, redis_client) -> None:
+    async def test_list_reservations(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """Listing reservations for a hotel should return all bookings."""
         res_svc, _ = await self._setup(redis_client)
         for i in range(3):
@@ -336,7 +337,7 @@ class TestReservationService:
         assert len(reservations) == 3
 
     @pytest.mark.asyncio
-    async def test_insufficient_inventory_fails(self, redis_client) -> None:
+    async def test_insufficient_inventory_fails(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """Booking more rooms than available should fail."""
         inv_svc = InventoryService(redis_client)
         res_svc = ReservationService(redis_client, inv_svc)
@@ -363,7 +364,7 @@ class TestReservationService:
 class TestStateMachine:
     """Tests for reservation state transitions."""
 
-    async def _make_reservation(self, redis_client) -> tuple[ReservationService, Reservation]:
+    async def _make_reservation(self, redis_client: fakeredis.aioredis.FakeRedis) -> tuple[ReservationService, Reservation]:
         inv_svc = InventoryService(redis_client)
         res_svc = ReservationService(redis_client, inv_svc)
         await inv_svc.init_inventory("h1", "rt1", "2025-07-01", 100)
@@ -379,14 +380,14 @@ class TestStateMachine:
         return res_svc, r
 
     @pytest.mark.asyncio
-    async def test_confirmed_to_checked_in(self, redis_client) -> None:
+    async def test_confirmed_to_checked_in(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """CONFIRMED -> CHECKED_IN should be valid."""
         res_svc, r = await self._make_reservation(redis_client)
         updated = await res_svc.update_status(r.reservation_id, ReservationStatus.CHECKED_IN)
         assert updated.status == ReservationStatus.CHECKED_IN
 
     @pytest.mark.asyncio
-    async def test_checked_in_to_checked_out(self, redis_client) -> None:
+    async def test_checked_in_to_checked_out(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """CHECKED_IN -> CHECKED_OUT should be valid."""
         res_svc, r = await self._make_reservation(redis_client)
         await res_svc.update_status(r.reservation_id, ReservationStatus.CHECKED_IN)
@@ -394,7 +395,7 @@ class TestStateMachine:
         assert updated.status == ReservationStatus.CHECKED_OUT
 
     @pytest.mark.asyncio
-    async def test_invalid_transition_checked_out_to_confirmed(self, redis_client) -> None:
+    async def test_invalid_transition_checked_out_to_confirmed(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """CHECKED_OUT -> CONFIRMED should be invalid."""
         res_svc, r = await self._make_reservation(redis_client)
         await res_svc.update_status(r.reservation_id, ReservationStatus.CHECKED_IN)
@@ -404,7 +405,7 @@ class TestStateMachine:
             await res_svc.update_status(r.reservation_id, ReservationStatus.CONFIRMED)
 
     @pytest.mark.asyncio
-    async def test_cancelled_is_terminal(self, redis_client) -> None:
+    async def test_cancelled_is_terminal(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """CANCELLED is a terminal state with no valid transitions."""
         res_svc, r = await self._make_reservation(redis_client)
         await res_svc.cancel_reservation(r.reservation_id)
@@ -422,7 +423,7 @@ class TestConcurrency:
     """Tests for optimistic locking under concurrent access."""
 
     @pytest.mark.asyncio
-    async def test_concurrent_reservations_no_oversell(self, redis_client) -> None:
+    async def test_concurrent_reservations_no_oversell(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """Multiple concurrent bookings should not exceed the overbooking limit."""
         inv_svc = InventoryService(redis_client)
         await inv_svc.init_inventory("h1", "rt1", "2025-07-01", 10)
@@ -449,7 +450,7 @@ class TestConcurrency:
         assert inv.total_reserved == 11
 
     @pytest.mark.asyncio
-    async def test_concurrent_full_reservations(self, redis_client) -> None:
+    async def test_concurrent_full_reservations(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """Two full-service reservations competing for limited inventory."""
         inv_svc = InventoryService(redis_client)
         res_svc = ReservationService(redis_client, inv_svc)

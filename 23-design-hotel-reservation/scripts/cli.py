@@ -123,6 +123,7 @@ def cmd_get_reservation(reservation_id: str) -> None:
 # -----------------------------------------------------------------------
 
 def main() -> None:
+    global BASE_URL
     parser = argparse.ArgumentParser(description="Hotel Reservation CLI")
     parser.add_argument("command", nargs="?",
                         choices=["hotel-create", "hotel-list", "inventory-init",
@@ -144,7 +145,6 @@ def main() -> None:
 
     args = parser.parse_args()
 
-    global BASE_URL
     BASE_URL = args.base_url
 
     if args.health:

@@ -363,6 +363,16 @@ python scripts/cli.py --health                     # 헬스 체크
 | `LOCATION_TTL` | `60` | 위치 캐시 TTL (초) |
 | `NEARBY_RADIUS_MILES` | `5` | 주변 친구 기본 반경 (마일) |
 
+## 테스트 실행
+
+```bash
+# 의존성 설치
+pip install -r server/requirements.txt
+
+# 테스트 실행
+pytest tests/ -v
+```
+
 ## 참고
 
 - Alex Xu, "System Design Interview - An Insider's Guide Vol.2", Chapter 18

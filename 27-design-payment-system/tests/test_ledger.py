@@ -8,7 +8,7 @@ from ledger.service import LedgerService
 
 
 @pytest.mark.asyncio
-async def test_record_creates_two_entries(ledger: LedgerService):
+async def test_record_creates_two_entries(ledger: LedgerService) -> None:
     """A payment should produce exactly one DEBIT and one CREDIT entry."""
     entries = await ledger.record(
         payment_id="pay_001",
@@ -28,7 +28,7 @@ async def test_record_creates_two_entries(ledger: LedgerService):
 
 
 @pytest.mark.asyncio
-async def test_balance_check_is_zero(ledger: LedgerService):
+async def test_balance_check_is_zero(ledger: LedgerService) -> None:
     """Sum of DEBIT + CREDIT for a payment should always be zero."""
     await ledger.record(
         payment_id="pay_002",
@@ -43,7 +43,7 @@ async def test_balance_check_is_zero(ledger: LedgerService):
 
 
 @pytest.mark.asyncio
-async def test_get_entries(ledger: LedgerService):
+async def test_get_entries(ledger: LedgerService) -> None:
     """Should retrieve stored entries by payment ID."""
     await ledger.record(
         payment_id="pay_003",
@@ -58,7 +58,7 @@ async def test_get_entries(ledger: LedgerService):
 
 
 @pytest.mark.asyncio
-async def test_get_entries_empty(ledger: LedgerService):
+async def test_get_entries_empty(ledger: LedgerService) -> None:
     """Should return empty list for a non-existent payment."""
     entries = await ledger.get_entries("pay_nonexistent")
     assert entries == []

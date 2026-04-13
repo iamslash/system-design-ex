@@ -244,7 +244,7 @@ python scripts/cli.py --around alice
 ## 테스트
 
 ```bash
-pip install fastapi redis pytest pytest-asyncio fakeredis
+pip install -r api/requirements.txt
 pytest tests/ -v
 ```
 

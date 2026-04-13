@@ -17,22 +17,22 @@ from storage.message_store import MessageStore
 
 
 def make_dm_channel(user_a: str, user_b: str) -> str:
-    """1:1 채팅의 채널 ID 를 생성한다.
+    """Generate a channel ID for a 1:1 DM conversation.
 
-    두 사용자를 정렬하여 동일한 쌍은 항상 같은 채널 ID 를 갖도록 한다.
-    예: dm:alice:bob == dm:bob:alice
+    Users are sorted so the same pair always maps to the same channel ID.
+    Example: dm:alice:bob == dm:bob:alice
     """
     a, b = sorted([user_a, user_b])
     return f"dm:{a}:{b}"
 
 
 class MessageHandler:
-    """1:1 메시지와 그룹 메시지를 라우팅한다.
+    """Route 1:1 and group messages.
 
-    메시지 흐름:
-      1. 메시지 ID 생성 (IdGenerator)
-      2. Redis 에 메시지 저장 (MessageStore)
-      3. 수신자에게 WebSocket 으로 전달 (ConnectionManager)
+    Message flow:
+      1. Generate message ID (IdGenerator)
+      2. Persist message in Redis (MessageStore)
+      3. Deliver to recipients via WebSocket (ConnectionManager)
     """
 
     def __init__(
@@ -46,11 +46,11 @@ class MessageHandler:
         self._redis = redis_client
 
     async def handle_dm(self, from_user: str, to_user: str, content: str) -> dict[str, Any]:
-        """1:1 메시지를 처리한다.
+        """Process a 1:1 direct message.
 
-        1. 채널 ID 생성 (정렬된 사용자 쌍)
-        2. 메시지 ID 생성 및 Redis 저장
-        3. 수신자에게 실시간 전달
+        1. Generate channel ID (sorted user pair)
+        2. Generate message ID and persist to Redis
+        3. Deliver to recipient in real time
         """
         channel_id = make_dm_channel(from_user, to_user)
         msg_id = id_generator.generate()
@@ -66,12 +66,12 @@ class MessageHandler:
             "timestamp": ts,
         }
 
-        # Redis 에 메시지 저장
+        # Persist message to Redis
         await self._store.save_message(channel_id, message_data)
 
-        # 수신자에게 실시간 전달
+        # Deliver to recipient in real time
         await self._conn.send_to_user(to_user, message_data)
-        # 발신자의 다른 디바이스에도 전달
+        # Also deliver to sender's other devices
         await self._conn.send_to_user(from_user, message_data)
 
         return message_data
@@ -79,15 +79,15 @@ class MessageHandler:
     async def handle_group_message(
         self, from_user: str, group_id: str, content: str
     ) -> dict[str, Any] | None:
-        """그룹 메시지를 처리한다.
+        """Process a group message.
 
-        1. Redis 에서 그룹 멤버 목록 조회
-        2. 메시지 ID 생성 및 Redis 저장
-        3. 모든 그룹 멤버에게 실시간 전달
+        1. Fetch group member list from Redis
+        2. Generate message ID and persist to Redis
+        3. Deliver to all group members in real time
         """
         import json as _json
 
-        # 그룹 정보 조회
+        # Fetch group info
         group_data = await self._redis.hgetall(f"group:{group_id}")
         if not group_data:
             return None
@@ -107,10 +107,10 @@ class MessageHandler:
             "timestamp": ts,
         }
 
-        # Redis 에 메시지 저장
+        # Persist message to Redis
         await self._store.save_message(channel_id, message_data)
 
-        # 모든 그룹 멤버에게 전달
+        # Deliver to all group members
         await self._conn.broadcast(members, message_data)
 
         return message_data

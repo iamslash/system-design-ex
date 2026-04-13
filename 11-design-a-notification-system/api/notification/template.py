@@ -1,15 +1,15 @@
 """Notification template engine with variable substitution.
 
-템플릿에 정의된 제목/본문에서 {변수명} 을 실제 값으로 치환한다.
-새로운 템플릿은 TEMPLATES 딕셔너리에 추가하면 된다.
+Replaces {variable_name} placeholders in template titles and bodies with actual values.
+New templates can be added to the TEMPLATES dictionary.
 """
 
 from __future__ import annotations
 
 from typing import Any
 
-# 채널별 알림 템플릿 정의
-# 각 템플릿은 title 과 body 를 가지며, {변수명} 형식의 플레이스홀더를 지원한다.
+# Notification template definitions per channel.
+# Each template has a title and body, supporting {variable_name} format placeholders.
 TEMPLATES: dict[str, dict[str, str]] = {
     "welcome": {
         "title": "Welcome, {name}!",
@@ -31,14 +31,14 @@ TEMPLATES: dict[str, dict[str, str]] = {
 
 
 def render_template(template_name: str, params: dict[str, Any]) -> dict[str, str]:
-    """템플릿 이름과 파라미터로 제목/본문을 렌더링한다.
+    """Render a template title and body using the given parameters.
 
     Args:
-        template_name: TEMPLATES 에 정의된 템플릿 키.
-        params: 플레이스홀더를 치환할 값 딕셔너리.
+        template_name: Key of the template defined in TEMPLATES.
+        params: Dictionary of values to substitute for placeholders.
 
     Returns:
-        {"title": "...", "body": "..."} 형태의 렌더링 결과.
+        Rendered result as {"title": "...", "body": "..."}.
 
     Examples:
         >>> render_template("welcome", {"name": "Alice"})
@@ -51,9 +51,9 @@ def render_template(template_name: str, params: dict[str, Any]) -> dict[str, str
 
 
 class _SafeDict(dict):
-    """누락된 키를 {key} 그대로 남기는 dict.
+    """A dict subclass that leaves missing keys as {key} instead of raising KeyError.
 
-    format_map 에서 KeyError 를 방지한다.
+    Prevents KeyError when used with format_map.
     """
 
     def __missing__(self, key: str) -> str:

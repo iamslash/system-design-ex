@@ -1,21 +1,15 @@
 """Tests for the notification system.
 
-fakeredis 를 사용하여 Redis 의존성 없이 단위 테스트를 수행한다.
+Uses fakeredis to run unit tests without a real Redis dependency.
 """
 
 from __future__ import annotations
 
 import asyncio
 import json
-import os
-import sys
 
 import fakeredis.aioredis
 import pytest
-import pytest_asyncio
-
-# api 디렉토리를 import 경로에 추가
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "api"))
 
 from models import Channel, NotificationRequest, Priority, UserPreferences
 from notification.dispatcher import (
@@ -29,42 +23,28 @@ from worker.consumer import is_duplicate, process_message, update_notification_s
 
 
 # ---------------------------------------------------------------------------
-# Fixtures
-# ---------------------------------------------------------------------------
-
-
-@pytest_asyncio.fixture
-async def redis_client():
-    """Create a fake async Redis client for testing."""
-    client = fakeredis.aioredis.FakeRedis(decode_responses=True)
-    yield client
-    await client.flushall()
-    await client.aclose()
-
-
-# ---------------------------------------------------------------------------
 # Template Rendering
 # ---------------------------------------------------------------------------
 
 
 class TestTemplateRendering:
-    """템플릿 렌더링 및 변수 치환 테스트."""
+    """Tests for template rendering and variable substitution."""
 
     def test_welcome_template(self) -> None:
-        """welcome 템플릿이 name 변수를 치환한다."""
+        """The welcome template substitutes the name variable."""
         result = render_template("welcome", {"name": "Alice"})
         assert result["title"] == "Welcome, Alice!"
         assert "Alice" in result["body"]
 
     def test_payment_template(self) -> None:
-        """payment 템플릿이 name, amount 변수를 치환한다."""
+        """The payment template substitutes the name and amount variables."""
         result = render_template("payment", {"name": "Bob", "amount": "$99.99"})
         assert result["title"] == "Payment Received"
         assert "Bob" in result["body"]
         assert "$99.99" in result["body"]
 
     def test_shipping_template(self) -> None:
-        """shipping 템플릿이 모든 변수를 치환한다."""
+        """The shipping template substitutes all variables."""
         result = render_template(
             "shipping",
             {"name": "Carol", "order_id": "12345", "tracking": "TRK-001"},
@@ -74,12 +54,12 @@ class TestTemplateRendering:
         assert "TRK-001" in result["body"]
 
     def test_missing_params_preserved(self) -> None:
-        """누락된 파라미터는 {key} 형태로 남는다."""
+        """Missing parameters are preserved as {key} placeholders."""
         result = render_template("welcome", {})
         assert "{name}" in result["title"]
 
     def test_unknown_template_uses_default(self) -> None:
-        """존재하지 않는 템플릿 이름은 default 를 사용한다."""
+        """An unknown template name falls back to the default template."""
         result = render_template("nonexistent", {})
         assert result["title"] == "Notification"
 
@@ -90,11 +70,11 @@ class TestTemplateRendering:
 
 
 class TestDispatcher:
-    """디스패처가 올바른 큐로 라우팅하는지 테스트."""
+    """Tests that the dispatcher routes notifications to the correct queue."""
 
     @pytest.mark.asyncio
-    async def test_dispatch_to_push_queue(self, redis_client) -> None:
-        """push 채널 알림이 queue:push 에 들어간다."""
+    async def test_dispatch_to_push_queue(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
+        """A push channel notification is placed in queue:push."""
         request = NotificationRequest(
             user_id="user1",
             channel=Channel.PUSH,
@@ -105,13 +85,13 @@ class TestDispatcher:
         assert result["status"] == "pending"
         assert result["notification_id"] is not None
 
-        # queue:push 에 메시지가 있는지 확인
+        # Verify that a message is in queue:push
         queue_len = await redis_client.llen("queue:push")
         assert queue_len == 1
 
     @pytest.mark.asyncio
-    async def test_dispatch_to_sms_queue(self, redis_client) -> None:
-        """sms 채널 알림이 queue:sms 에 들어간다."""
+    async def test_dispatch_to_sms_queue(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
+        """An SMS channel notification is placed in queue:sms."""
         request = NotificationRequest(
             user_id="user1",
             channel=Channel.SMS,
@@ -125,8 +105,8 @@ class TestDispatcher:
         assert queue_len == 1
 
     @pytest.mark.asyncio
-    async def test_dispatch_to_email_queue(self, redis_client) -> None:
-        """email 채널 알림이 queue:email 에 들어간다."""
+    async def test_dispatch_to_email_queue(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
+        """An email channel notification is placed in queue:email."""
         request = NotificationRequest(
             user_id="user1",
             channel=Channel.EMAIL,
@@ -146,11 +126,11 @@ class TestDispatcher:
 
 
 class TestRateLimiting:
-    """Per-user, per-channel rate limiting 테스트."""
+    """Tests for per-user, per-channel rate limiting."""
 
     @pytest.mark.asyncio
-    async def test_allows_within_limit(self, redis_client) -> None:
-        """제한 이내 요청은 허용된다."""
+    async def test_allows_within_limit(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
+        """Requests within the limit are allowed."""
         limits = {"push": 3, "sms": 3, "email": 3}
         for _ in range(3):
             allowed = await check_rate_limit(
@@ -159,25 +139,25 @@ class TestRateLimiting:
             assert allowed is True
 
     @pytest.mark.asyncio
-    async def test_blocks_excess_requests(self, redis_client) -> None:
-        """제한 초과 요청은 차단된다."""
+    async def test_blocks_excess_requests(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
+        """Requests exceeding the limit are blocked."""
         limits = {"push": 2, "sms": 2, "email": 2}
         for _ in range(2):
             await check_rate_limit(
                 redis_client, "user1", "push", window_size=3600, limits=limits,
             )
 
-        # 3번째 요청은 차단
+        # The 3rd request should be blocked
         allowed = await check_rate_limit(
             redis_client, "user1", "push", window_size=3600, limits=limits,
         )
         assert allowed is False
 
     @pytest.mark.asyncio
-    async def test_independent_channels(self, redis_client) -> None:
-        """채널별 rate limit 은 독립적이다."""
+    async def test_independent_channels(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
+        """Rate limits are independent per channel."""
         limits = {"push": 1, "sms": 1, "email": 1}
-        # push 제한 도달
+        # Reach the push limit
         await check_rate_limit(
             redis_client, "user1", "push", window_size=3600, limits=limits,
         )
@@ -186,15 +166,15 @@ class TestRateLimiting:
         )
         assert allowed_push is False
 
-        # sms 는 여전히 허용
+        # SMS is still allowed
         allowed_sms = await check_rate_limit(
             redis_client, "user1", "sms", window_size=3600, limits=limits,
         )
         assert allowed_sms is True
 
     @pytest.mark.asyncio
-    async def test_independent_users(self, redis_client) -> None:
-        """사용자별 rate limit 은 독립적이다."""
+    async def test_independent_users(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
+        """Rate limits are independent per user."""
         limits = {"push": 1, "sms": 1, "email": 1}
         await check_rate_limit(
             redis_client, "user1", "push", window_size=3600, limits=limits,
@@ -204,7 +184,7 @@ class TestRateLimiting:
         )
         assert blocked is False
 
-        # user2 는 여전히 허용
+        # user2 is still allowed
         allowed = await check_rate_limit(
             redis_client, "user2", "push", window_size=3600, limits=limits,
         )
@@ -217,12 +197,12 @@ class TestRateLimiting:
 
 
 class TestUserPreferences:
-    """사용자 알림 설정에 의한 opt-out 테스트."""
+    """Tests for notification opt-out via user preferences."""
 
     @pytest.mark.asyncio
-    async def test_opt_out_blocks_notification(self, redis_client) -> None:
-        """opt-out 된 채널로는 알림이 전송되지 않는다."""
-        # sms opt-out 설정
+    async def test_opt_out_blocks_notification(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
+        """Notifications are not sent to opted-out channels."""
+        # Configure SMS opt-out
         prefs = UserPreferences(push=True, sms=False, email=True)
         await save_user_preferences(redis_client, "user1", prefs)
 
@@ -237,8 +217,8 @@ class TestUserPreferences:
         assert "opted out" in result["message"]
 
     @pytest.mark.asyncio
-    async def test_opt_in_allows_notification(self, redis_client) -> None:
-        """opt-in 된 채널로는 알림이 정상 전송된다."""
+    async def test_opt_in_allows_notification(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
+        """Notifications are delivered normally to opted-in channels."""
         prefs = UserPreferences(push=True, sms=False, email=True)
         await save_user_preferences(redis_client, "user1", prefs)
 
@@ -252,8 +232,8 @@ class TestUserPreferences:
         assert result["status"] == "pending"
 
     @pytest.mark.asyncio
-    async def test_default_preferences_all_enabled(self, redis_client) -> None:
-        """설정이 없는 사용자는 모든 채널이 활성화된다."""
+    async def test_default_preferences_all_enabled(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
+        """Users without saved preferences have all channels enabled by default."""
         prefs = await get_user_preferences(redis_client, "new_user")
         assert prefs.push is True
         assert prefs.sms is True
@@ -266,13 +246,13 @@ class TestUserPreferences:
 
 
 class TestRetryMechanism:
-    """실패 시 retry 메커니즘 테스트."""
+    """Tests for the retry mechanism on send failure."""
 
     @pytest.mark.asyncio
-    async def test_failure_triggers_requeue(self, redis_client) -> None:
-        """전송 실패 시 메시지가 다시 큐에 들어간다."""
+    async def test_failure_triggers_requeue(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
+        """A failed send causes the message to be requeued."""
         notification_id = "test-retry-001"
-        # 알림 레코드 생성
+        # Create a notification record
         await redis_client.hset(
             f"notification:{notification_id}",
             mapping={
@@ -282,7 +262,7 @@ class TestRetryMechanism:
             },
         )
 
-        # 100% 실패율로 메시지 처리
+        # Process message with 100% failure rate
         message = json.dumps({
             "notification_id": notification_id,
             "user_id": "user1",
@@ -298,18 +278,18 @@ class TestRetryMechanism:
         with patch("worker.consumer.CHANNEL_HANDLERS", {"push": AsyncMock(return_value=False)}):
             await process_message(redis_client, message)
 
-        # 큐에 재삽입되었는지 확인
+        # Verify the message was requeued
         queue_len = await redis_client.llen("queue:push")
         assert queue_len == 1
 
-        # retry_count 가 증가했는지 확인
+        # Verify that retry_count was incremented
         requeued = await redis_client.rpop("queue:push")
         requeued_data = json.loads(requeued)
         assert requeued_data["retry_count"] == 1
 
     @pytest.mark.asyncio
-    async def test_success_after_retry(self, redis_client) -> None:
-        """재시도 후 성공하면 상태가 sent 로 갱신된다."""
+    async def test_success_after_retry(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
+        """A successful send after retry updates the status to sent."""
         notification_id = "test-retry-success-001"
         await redis_client.hset(
             f"notification:{notification_id}",
@@ -339,8 +319,8 @@ class TestRetryMechanism:
         assert status == "sent"
 
     @pytest.mark.asyncio
-    async def test_max_retries_marks_failed(self, redis_client) -> None:
-        """최대 재시도 초과 시 상태가 failed 로 갱신된다."""
+    async def test_max_retries_marks_failed(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
+        """Exceeding the maximum retries updates the status to failed."""
         notification_id = "test-max-retry-001"
         await redis_client.hset(
             f"notification:{notification_id}",
@@ -351,7 +331,7 @@ class TestRetryMechanism:
             },
         )
 
-        # retry_count 가 이미 MAX_RETRIES(3) 인 메시지
+        # Message already at MAX_RETRIES (3)
         message = json.dumps({
             "notification_id": notification_id,
             "user_id": "user1",
@@ -370,24 +350,24 @@ class TestRetryMechanism:
         status = await redis_client.hget(f"notification:{notification_id}", "status")
         assert status == "failed"
 
-        # 큐에 재삽입되지 않았는지 확인
+        # Verify the message was NOT requeued
         queue_len = await redis_client.llen("queue:push")
         assert queue_len == 0
 
 
 # ---------------------------------------------------------------------------
-# Dedup (중복 처리 방지)
+# Dedup (duplicate processing prevention)
 # ---------------------------------------------------------------------------
 
 
 class TestDedup:
-    """중복 알림 처리 방지 테스트."""
+    """Tests for duplicate notification processing prevention."""
 
     @pytest.mark.asyncio
-    async def test_duplicate_not_processed(self, redis_client) -> None:
-        """이미 sent 상태인 알림은 다시 처리되지 않는다."""
+    async def test_duplicate_not_processed(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
+        """A notification already in sent status is not processed again."""
         notification_id = "test-dedup-001"
-        # 이미 sent 상태로 저장
+        # Store as already sent
         await redis_client.hset(
             f"notification:{notification_id}",
             mapping={
@@ -399,8 +379,8 @@ class TestDedup:
         assert await is_duplicate(redis_client, notification_id) is True
 
     @pytest.mark.asyncio
-    async def test_pending_is_not_duplicate(self, redis_client) -> None:
-        """pending 상태의 알림은 중복이 아니다."""
+    async def test_pending_is_not_duplicate(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
+        """A notification in pending status is not considered a duplicate."""
         notification_id = "test-dedup-002"
         await redis_client.hset(
             f"notification:{notification_id}",
@@ -413,8 +393,8 @@ class TestDedup:
         assert await is_duplicate(redis_client, notification_id) is False
 
     @pytest.mark.asyncio
-    async def test_duplicate_skips_processing(self, redis_client) -> None:
-        """중복 메시지는 채널 핸들러를 호출하지 않는다."""
+    async def test_duplicate_skips_processing(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
+        """Duplicate messages do not invoke the channel handler."""
         notification_id = "test-dedup-003"
         await redis_client.hset(
             f"notification:{notification_id}",
@@ -440,7 +420,7 @@ class TestDedup:
         with patch("worker.consumer.CHANNEL_HANDLERS", {"push": mock_handler}):
             await process_message(redis_client, message)
 
-        # 핸들러가 호출되지 않았어야 함
+        # The handler should not have been called
         mock_handler.assert_not_called()
 
 
@@ -450,11 +430,11 @@ class TestDedup:
 
 
 class TestStatusTracking:
-    """알림 상태 추적 (pending -> sent) 테스트."""
+    """Tests for notification status tracking (pending -> sent)."""
 
     @pytest.mark.asyncio
-    async def test_pending_to_sent(self, redis_client) -> None:
-        """성공적으로 전송되면 pending -> sent 로 변경된다."""
+    async def test_pending_to_sent(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
+        """A successfully delivered notification transitions from pending to sent."""
         notification_id = "test-status-001"
         await redis_client.hset(
             f"notification:{notification_id}",
@@ -483,13 +463,13 @@ class TestStatusTracking:
         status = await redis_client.hget(f"notification:{notification_id}", "status")
         assert status == "sent"
 
-        # sent_at 타임스탬프가 기록되었는지 확인
+        # Verify that the sent_at timestamp was recorded
         sent_at = await redis_client.hget(f"notification:{notification_id}", "sent_at")
         assert sent_at is not None
 
     @pytest.mark.asyncio
-    async def test_update_notification_status(self, redis_client) -> None:
-        """상태 갱신 유틸리티가 올바르게 동작한다."""
+    async def test_update_notification_status(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
+        """The status update utility works correctly."""
         notification_id = "test-update-001"
         await redis_client.hset(
             f"notification:{notification_id}",

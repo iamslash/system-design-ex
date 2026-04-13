@@ -1,7 +1,7 @@
 """BFS Web Crawler.
 
-Seed URL 에서 시작하여 BFS (너비 우선 탐색) 방식으로 웹 페이지를 크롤링한다.
-URL Frontier, HTML Parser, Dedup, Robots.txt 체커를 조합하여 동작한다.
+Starting from a seed URL, crawls web pages using BFS (breadth-first search).
+Combines URL Frontier, HTML Parser, Dedup, and Robots.txt checker.
 """
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ from src.robots_parser import RobotsChecker
 
 @dataclass
 class CrawlResult:
-    """단일 페이지 크롤링 결과."""
+    """Result of crawling a single page."""
 
     url: str
     status_code: int
@@ -33,7 +33,7 @@ class CrawlResult:
 
 @dataclass
 class CrawlStats:
-    """크롤링 전체 통계."""
+    """Overall crawl statistics."""
 
     pages_crawled: int = 0
     pages_failed: int = 0
@@ -46,12 +46,12 @@ class CrawlStats:
 class WebCrawler:
     """BFS web crawler.
 
-    Seed URL 목록에서 시작하여 너비 우선으로 페이지를 탐색한다.
-    각 컴포넌트의 역할:
-      - URLFrontier: 크롤링 대기열 관리 (우선순위 + 예의)
-      - URLSeen: 이미 본 URL 중복 방지
-      - ContentSeen: 동일 컨텐츠 중복 탐지
-      - RobotsChecker: robots.txt 준수
+    Explores pages breadth-first starting from a list of seed URLs.
+    Each component's role:
+      - URLFrontier: manages the crawl queue (priority + politeness)
+      - URLSeen: prevents duplicate URL visits
+      - ContentSeen: detects duplicate content
+      - RobotsChecker: respects robots.txt
     """
 
     DEFAULT_USER_AGENT = "SystemDesignCrawler/1.0"
@@ -68,18 +68,18 @@ class WebCrawler:
         """Initialize crawler.
 
         Args:
-            seed_urls: 크롤링 시작 URL 목록.
-            max_pages: 최대 크롤링 페이지 수.
-            max_depth: 최대 크롤링 깊이 (seed = depth 0).
-            politeness_delay: 같은 호스트 요청 간 최소 대기 시간 (초).
-            request_timeout: HTTP 요청 타임아웃 (초).
-            user_agent: HTTP User-Agent 헤더.
+            seed_urls: List of seed URLs to start crawling from.
+            max_pages: Maximum number of pages to crawl.
+            max_depth: Maximum crawl depth (seed = depth 0).
+            politeness_delay: Minimum wait time between requests to the same host (seconds).
+            request_timeout: HTTP request timeout (seconds).
+            user_agent: HTTP User-Agent header value.
         """
         self._max_pages = max_pages
         self._request_timeout = request_timeout
         self._user_agent = user_agent
 
-        # 컴포넌트 초기화
+        # Initialize components
         self._frontier = URLFrontier(
             politeness_delay=politeness_delay,
             max_depth=max_depth,
@@ -91,17 +91,17 @@ class WebCrawler:
             timeout=request_timeout,
         )
 
-        # Seed URL 을 frontier 에 추가
+        # Add seed URLs to frontier
         for url in seed_urls:
             if not self._url_seen.is_seen(url):
                 self._url_seen.add(url)
                 self._frontier.add(url, priority=0, depth=0)
 
     def crawl(self) -> tuple[list[CrawlResult], CrawlStats]:
-        """BFS 크롤링을 실행한다.
+        """Run BFS crawling.
 
         Returns:
-            (결과 리스트, 통계) 튜플.
+            Tuple of (list of results, statistics).
         """
         results: list[CrawlResult] = []
         stats = CrawlStats()
@@ -115,17 +115,17 @@ class WebCrawler:
             url = entry.url
             depth = entry.depth
 
-            # 1. robots.txt 확인
+            # 1. Check robots.txt
             if not self._robots.is_allowed(url):
                 stats.robots_blocked += 1
                 continue
 
-            # 2. Politeness delay 대기
+            # 2. Wait for politeness delay
             wait = self._frontier.get_wait_time(url)
             if wait > 0:
                 time.sleep(wait)
 
-            # 3. 페이지 다운로드
+            # 3. Download page
             result = self._download(url, depth)
             self._frontier.record_access(url)
 
@@ -136,7 +136,7 @@ class WebCrawler:
 
             stats.pages_crawled += 1
 
-            # 4. 컨텐츠 중복 확인
+            # 4. Check content for duplicates
             if result.content_duplicate:
                 stats.content_duplicates += 1
                 results.append(result)
@@ -149,7 +149,7 @@ class WebCrawler:
         return results, stats
 
     def _download(self, url: str, depth: int) -> CrawlResult:
-        """페이지를 다운로드하고 파싱한다."""
+        """Download and parse a page."""
         try:
             resp = requests.get(
                 url,
@@ -175,19 +175,19 @@ class WebCrawler:
 
         content = resp.text
 
-        # 컨텐츠 중복 확인
+        # Check content for duplicates
         is_dup = self._content_seen.is_duplicate(content)
 
-        # HTML 파싱 및 링크 추출
+        # Parse HTML and extract links
         title = extract_title(content)
         links = extract_links(content, url)
 
-        # 새로운 URL 을 frontier 에 추가
+        # Add new URLs to frontier
         new_depth = depth + 1
         for link in links:
             if not self._url_seen.is_seen(link):
                 self._url_seen.add(link)
-                # 같은 도메인이면 높은 우선순위, 다른 도메인이면 낮은 우선순위
+                # Same domain -> higher priority, different domain -> lower priority
                 priority = self._compute_priority(url, link)
                 self._frontier.add(link, priority=priority, depth=new_depth)
 
@@ -202,10 +202,10 @@ class WebCrawler:
 
     @staticmethod
     def _compute_priority(source_url: str, target_url: str) -> int:
-        """링크의 크롤링 우선순위를 계산한다.
+        """Compute crawl priority for a link.
 
-        같은 도메인 → 높은 우선순위 (3)
-        다른 도메인 → 낮은 우선순위 (7)
+        Same domain -> higher priority (3)
+        Different domain -> lower priority (7)
         """
         try:
             source_host = urlparse(source_url).netloc.lower()

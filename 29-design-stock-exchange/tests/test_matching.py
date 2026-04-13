@@ -9,7 +9,7 @@ def make_order(oid: str, side: Side, price: float, qty: float) -> Order:
     return Order(order_id=oid, symbol="AAPL", side=side, price=price, quantity=qty)
 
 
-def test_no_match_no_crossing():
+def test_no_match_no_crossing() -> None:
     """Buy below ask should rest on book, no execution."""
     engine = MatchingEngine()
     engine.process_order(make_order("S1", Side.SELL, 101.0, 100))
@@ -20,7 +20,7 @@ def test_no_match_no_crossing():
     assert book.order_count == 2
 
 
-def test_exact_match():
+def test_exact_match() -> None:
     """Buy at ask price with equal quantity should produce one execution."""
     engine = MatchingEngine()
     engine.process_order(make_order("S1", Side.SELL, 100.0, 100))
@@ -36,7 +36,7 @@ def test_exact_match():
     assert book.order_count == 0
 
 
-def test_partial_fill_buy():
+def test_partial_fill_buy() -> None:
     """Buy for more than available sell should partially fill."""
     engine = MatchingEngine()
     engine.process_order(make_order("S1", Side.SELL, 100.0, 50))
@@ -50,7 +50,7 @@ def test_partial_fill_buy():
     assert book.best_bid() == 100.0
 
 
-def test_multiple_fills():
+def test_multiple_fills() -> None:
     """One aggressive order should sweep through multiple resting orders."""
     engine = MatchingEngine()
     engine.process_order(make_order("S1", Side.SELL, 100.0, 100))
@@ -69,7 +69,7 @@ def test_multiple_fills():
     assert total_filled == 250
 
 
-def test_fifo_priority():
+def test_fifo_priority() -> None:
     """At the same price, earlier order should fill first."""
     engine = MatchingEngine()
     engine.process_order(make_order("S1", Side.SELL, 100.0, 100))
@@ -81,7 +81,7 @@ def test_fifo_priority():
     assert execs[0].sell_order_id == "S1"  # FIFO: S1 was first
 
 
-def test_sell_matches_buy():
+def test_sell_matches_buy() -> None:
     """Incoming sell should match resting buy orders."""
     engine = MatchingEngine()
     engine.process_order(make_order("B1", Side.BUY, 100.0, 100))
@@ -92,7 +92,7 @@ def test_sell_matches_buy():
     assert execs[0].sell_order_id == "S1"
 
 
-def test_cancel_order():
+def test_cancel_order() -> None:
     """Cancelled order should not be matchable."""
     engine = MatchingEngine()
     engine.process_order(make_order("S1", Side.SELL, 100.0, 100))

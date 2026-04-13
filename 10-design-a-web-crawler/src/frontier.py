@@ -1,10 +1,10 @@
 """URL Frontier: priority queue + per-host politeness.
 
-Web crawler 의 URL Frontier 는 두 가지 역할을 한다:
-  1. Front queues (Priority): URL 의 중요도에 따라 우선순위를 부여
-  2. Back queues (Politeness): 같은 호스트에 대한 요청 간격을 조절
+A web crawler's URL Frontier serves two roles:
+  1. Front queues (Priority): assign priority based on URL importance
+  2. Back queues (Politeness): regulate the request interval for the same host
 
-이 모듈은 교육용으로 두 기능을 하나의 클래스에 통합 구현한다.
+This module combines both functions into a single class for educational purposes.
 """
 
 from __future__ import annotations
@@ -17,9 +17,9 @@ from urllib.parse import urlparse
 
 @dataclass(order=True)
 class FrontierEntry:
-    """Frontier 큐 항목.
+    """A frontier queue entry.
 
-    priority 가 낮을수록 먼저 처리된다 (min-heap).
+    Lower priority values are processed first (min-heap).
     """
 
     priority: int
@@ -31,9 +31,9 @@ class FrontierEntry:
 class URLFrontier:
     """URL Frontier with priority ordering and per-host politeness.
 
-    - Priority queue: 낮은 priority 값이 먼저 크롤링됨
-    - Politeness: 같은 호스트에 대한 연속 요청 사이에 최소 delay 유지
-    - Max depth: 설정된 최대 깊이를 초과하는 URL 은 추가하지 않음
+    - Priority queue: lower priority values are crawled first
+    - Politeness: maintains a minimum delay between consecutive requests to the same host
+    - Max depth: URLs exceeding the configured maximum depth are not added
     """
 
     def __init__(
@@ -44,8 +44,8 @@ class URLFrontier:
         """Initialize frontier.
 
         Args:
-            politeness_delay: 같은 호스트에 대한 최소 요청 간격 (초).
-            max_depth: 크롤링 최대 깊이. 이 깊이를 초과하는 URL 은 무시.
+            politeness_delay: Minimum request interval for the same host (seconds).
+            max_depth: Maximum crawl depth. URLs exceeding this depth are ignored.
         """
         self._heap: list[FrontierEntry] = []
         self._politeness_delay = politeness_delay
@@ -54,15 +54,15 @@ class URLFrontier:
         self._counter = 0  # tie-breaker for heap (FIFO within same priority)
 
     def add(self, url: str, priority: int = 5, depth: int = 0) -> bool:
-        """URL 을 Frontier 에 추가한다.
+        """Add a URL to the frontier.
 
         Args:
-            url: 크롤링할 URL.
-            priority: 우선순위 (0 = 최고, 9 = 최저). 기본값 5.
-            depth: 현재 URL 의 크롤링 깊이.
+            url: The URL to crawl.
+            priority: Priority (0 = highest, 9 = lowest). Default 5.
+            depth: The crawl depth of the current URL.
 
         Returns:
-            True: 추가 성공, False: max_depth 초과로 무시됨.
+            True: successfully added, False: ignored because max_depth was exceeded.
         """
         if depth > self._max_depth:
             return False
@@ -78,23 +78,23 @@ class URLFrontier:
         return True
 
     def get_next(self) -> FrontierEntry | None:
-        """다음에 크롤링할 URL 을 반환한다.
+        """Return the next URL to crawl.
 
-        Politeness delay 를 위해, 반환 전에 해당 호스트에 대한
-        마지막 접근 시간을 기록한다.
+        For politeness delay, records the last access time for the host
+        before returning.
 
         Returns:
-            FrontierEntry 또는 frontier 가 비어 있으면 None.
+            A FrontierEntry, or None if the frontier is empty.
         """
         if not self._heap:
             return None
         return heapq.heappop(self._heap)
 
     def get_wait_time(self, url: str) -> float:
-        """해당 URL 의 호스트에 대해 대기해야 할 시간(초)을 반환한다.
+        """Return how many seconds to wait before requesting the host of this URL.
 
         Returns:
-            대기 시간. 0 이면 즉시 요청 가능.
+            Wait time in seconds. 0 means the request can be made immediately.
         """
         host = self._get_host(url)
         last = self._last_access.get(host, 0.0)
@@ -103,13 +103,13 @@ class URLFrontier:
         return max(0.0, remaining)
 
     def record_access(self, url: str) -> None:
-        """호스트에 대한 접근 시간을 기록한다."""
+        """Record the access time for the host."""
         host = self._get_host(url)
         self._last_access[host] = time.monotonic()
 
     @property
     def size(self) -> int:
-        """Frontier 에 남아 있는 URL 수."""
+        """Number of URLs remaining in the frontier."""
         return len(self._heap)
 
     @property
@@ -126,7 +126,7 @@ class URLFrontier:
 
     @staticmethod
     def _get_host(url: str) -> str:
-        """URL 에서 호스트를 추출한다."""
+        """Extract the host from a URL."""
         try:
             return urlparse(url).netloc.lower()
         except ValueError:

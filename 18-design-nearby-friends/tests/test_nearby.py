@@ -9,6 +9,7 @@ import os
 import time
 from unittest.mock import AsyncMock, patch
 
+import fakeredis.aioredis
 import pytest
 
 # Add the server directory to the path so we can import modules.
@@ -70,7 +71,7 @@ class TestLocationTracker:
     """Tests for location update and caching with TTL."""
 
     @pytest.mark.asyncio
-    async def test_update_and_get(self, redis_client) -> None:
+    async def test_update_and_get(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """Location should be retrievable after update."""
         tracker = LocationTracker(redis_client, ttl=60)
         await tracker.update("alice", 40.7128, -74.0060)
@@ -82,14 +83,14 @@ class TestLocationTracker:
         assert loc["timestamp"] > 0
 
     @pytest.mark.asyncio
-    async def test_get_nonexistent_user(self, redis_client) -> None:
+    async def test_get_nonexistent_user(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """Getting location of unknown user should return None."""
         tracker = LocationTracker(redis_client, ttl=60)
         loc = await tracker.get("nobody")
         assert loc is None
 
     @pytest.mark.asyncio
-    async def test_update_overwrites_previous(self, redis_client) -> None:
+    async def test_update_overwrites_previous(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """A new update should overwrite the previous location."""
         tracker = LocationTracker(redis_client, ttl=60)
         await tracker.update("alice", 40.0, -74.0)
@@ -100,7 +101,7 @@ class TestLocationTracker:
         assert loc["longitude"] == -75.0
 
     @pytest.mark.asyncio
-    async def test_ttl_is_set(self, redis_client) -> None:
+    async def test_ttl_is_set(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """TTL should be set on the location key after update."""
         tracker = LocationTracker(redis_client, ttl=120)
         await tracker.update("alice", 40.0, -74.0)
@@ -108,7 +109,7 @@ class TestLocationTracker:
         assert 0 < ttl <= 120
 
     @pytest.mark.asyncio
-    async def test_ttl_expiry_removes_location(self, redis_client) -> None:
+    async def test_ttl_expiry_removes_location(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """After TTL expires, location should be gone (simulated with 1s TTL)."""
         tracker = LocationTracker(redis_client, ttl=1)
         await tracker.update("alice", 40.0, -74.0)
@@ -120,7 +121,7 @@ class TestLocationTracker:
         assert loc is None
 
     @pytest.mark.asyncio
-    async def test_remove_explicit(self, redis_client) -> None:
+    async def test_remove_explicit(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """Explicit remove should delete the location immediately."""
         tracker = LocationTracker(redis_client, ttl=60)
         await tracker.update("alice", 40.0, -74.0)
@@ -138,7 +139,7 @@ class TestLocationHistory:
     """Tests for append-only location history storage."""
 
     @pytest.mark.asyncio
-    async def test_append_and_retrieve(self, redis_client) -> None:
+    async def test_append_and_retrieve(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """Appended entry should be retrievable."""
         hist = LocationHistory(redis_client)
         await hist.append("alice", 40.7128, -74.0060, 1000.0)
@@ -147,7 +148,7 @@ class TestLocationHistory:
         assert entries[0]["latitude"] == 40.7128
 
     @pytest.mark.asyncio
-    async def test_chronological_order(self, redis_client) -> None:
+    async def test_chronological_order(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """Entries should be returned in chronological order."""
         hist = LocationHistory(redis_client)
         for i in range(5):
@@ -158,7 +159,7 @@ class TestLocationHistory:
         assert entries[4]["timestamp"] == 1004.0
 
     @pytest.mark.asyncio
-    async def test_count(self, redis_client) -> None:
+    async def test_count(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """Count should reflect total entries."""
         hist = LocationHistory(redis_client)
         for i in range(3):
@@ -166,7 +167,7 @@ class TestLocationHistory:
         assert await hist.count("alice") == 3
 
     @pytest.mark.asyncio
-    async def test_time_range_filter(self, redis_client) -> None:
+    async def test_time_range_filter(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """get_range should filter entries by time range."""
         hist = LocationHistory(redis_client)
         for i in range(10):
@@ -184,7 +185,7 @@ class TestNearbyFinder:
     """Tests for nearby friend discovery."""
 
     @pytest.mark.asyncio
-    async def test_add_and_get_friends(self, redis_client) -> None:
+    async def test_add_and_get_friends(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """Friendship should be bidirectional."""
         tracker = LocationTracker(redis_client, ttl=60)
         finder = NearbyFinder(redis_client, tracker)
@@ -193,7 +194,7 @@ class TestNearbyFinder:
         assert "alice" in await finder.get_friends("bob")
 
     @pytest.mark.asyncio
-    async def test_remove_friendship(self, redis_client) -> None:
+    async def test_remove_friendship(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """Removing friendship should be bidirectional."""
         tracker = LocationTracker(redis_client, ttl=60)
         finder = NearbyFinder(redis_client, tracker)
@@ -203,7 +204,7 @@ class TestNearbyFinder:
         assert "alice" not in await finder.get_friends("bob")
 
     @pytest.mark.asyncio
-    async def test_find_nearby_within_radius(self, redis_client) -> None:
+    async def test_find_nearby_within_radius(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """Friends within radius should be returned."""
         tracker = LocationTracker(redis_client, ttl=60)
         finder = NearbyFinder(redis_client, tracker)
@@ -219,7 +220,7 @@ class TestNearbyFinder:
         assert nearby[0]["distance_miles"] < 1
 
     @pytest.mark.asyncio
-    async def test_find_nearby_excludes_distant(self, redis_client) -> None:
+    async def test_find_nearby_excludes_distant(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """Friends outside the radius should not be returned."""
         tracker = LocationTracker(redis_client, ttl=60)
         finder = NearbyFinder(redis_client, tracker)
@@ -233,7 +234,7 @@ class TestNearbyFinder:
         assert len(nearby) == 0
 
     @pytest.mark.asyncio
-    async def test_find_nearby_excludes_expired_location(self, redis_client) -> None:
+    async def test_find_nearby_excludes_expired_location(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """Friends whose location TTL expired should not appear."""
         tracker = LocationTracker(redis_client, ttl=1)
         finder = NearbyFinder(redis_client, tracker)
@@ -250,7 +251,7 @@ class TestNearbyFinder:
         assert len(nearby) == 0
 
     @pytest.mark.asyncio
-    async def test_find_nearby_no_friends(self, redis_client) -> None:
+    async def test_find_nearby_no_friends(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """User with no friends should get empty list."""
         tracker = LocationTracker(redis_client, ttl=60)
         finder = NearbyFinder(redis_client, tracker)
@@ -260,7 +261,7 @@ class TestNearbyFinder:
         assert nearby == []
 
     @pytest.mark.asyncio
-    async def test_find_nearby_no_location(self, redis_client) -> None:
+    async def test_find_nearby_no_location(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """User without a location should get empty list."""
         tracker = LocationTracker(redis_client, ttl=60)
         finder = NearbyFinder(redis_client, tracker)
@@ -270,7 +271,7 @@ class TestNearbyFinder:
         assert nearby == []
 
     @pytest.mark.asyncio
-    async def test_find_nearby_sorted_by_distance(self, redis_client) -> None:
+    async def test_find_nearby_sorted_by_distance(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """Results should be sorted by distance (nearest first)."""
         tracker = LocationTracker(redis_client, ttl=60)
         finder = NearbyFinder(redis_client, tracker)
@@ -303,7 +304,7 @@ class TestPubSubChannel:
         assert _channel_name("alice") == "location:alice"
 
     @pytest.mark.asyncio
-    async def test_publish_returns_subscriber_count(self, redis_client) -> None:
+    async def test_publish_returns_subscriber_count(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """Publish should return the number of subscribers (0 if none)."""
         ps = LocationPubSub(redis_client)
         count = await ps.publish("alice", 40.0, -74.0)
@@ -311,7 +312,7 @@ class TestPubSubChannel:
         assert count == 0
 
     @pytest.mark.asyncio
-    async def test_subscribe_and_receive(self, redis_client) -> None:
+    async def test_subscribe_and_receive(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """Subscriber should receive published location updates within radius."""
         ps = LocationPubSub(redis_client)
         received: list[dict] = []
@@ -341,7 +342,7 @@ class TestPubSubChannel:
         await ps.unsubscribe("bob")
 
     @pytest.mark.asyncio
-    async def test_subscribe_filters_distant(self, redis_client) -> None:
+    async def test_subscribe_filters_distant(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """Updates from friends outside the radius should be filtered out."""
         ps = LocationPubSub(redis_client)
         received: list[dict] = []
@@ -366,7 +367,7 @@ class TestPubSubChannel:
         await ps.unsubscribe("bob")
 
     @pytest.mark.asyncio
-    async def test_unsubscribe_cleanup(self, redis_client) -> None:
+    async def test_unsubscribe_cleanup(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """After unsubscribe, no more updates should be received."""
         ps = LocationPubSub(redis_client)
         received: list[dict] = []
@@ -388,7 +389,7 @@ class TestPubSubChannel:
         assert len(received) == 0
 
     @pytest.mark.asyncio
-    async def test_close_all(self, redis_client) -> None:
+    async def test_close_all(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """close_all should clean up all subscriptions."""
         ps = LocationPubSub(redis_client)
 

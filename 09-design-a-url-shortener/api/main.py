@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
@@ -26,7 +27,7 @@ store: RedisURLStore | None = None
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Manage Redis connection lifecycle."""
     global redis_client, store
     redis_client = Redis(
@@ -95,7 +96,7 @@ async def shorten(body: ShortenRequest) -> ShortenResponse:
     """
     long_url = str(body.url)
 
-    # 중복 확인: 같은 URL 이 이미 단축되었으면 기존 코드 반환
+    # Dedup check: return existing code if same URL was already shortened
     existing_code = await store.get_code_by_long_url(long_url)
     if existing_code:
         return ShortenResponse(
@@ -103,12 +104,12 @@ async def shorten(body: ShortenRequest) -> ShortenResponse:
             short_code=existing_code,
         )
 
-    # 단축 코드 생성
+    # Generate short code
     if settings.SHORTENER_APPROACH == "hash":
-        # 해시 방식: CRC32 해시의 앞 7자 + 충돌 해결
+        # Hash approach: first 7 chars of CRC32 hash + collision resolution
         short_code = hash_generate(long_url)
 
-        # 충돌 확인 및 해결
+        # Check and resolve collisions
         attempt = 0
         candidate_url = long_url
         suffixes = ["!", "@", "#", "$", "%", "^", "&", "*"]
@@ -122,11 +123,11 @@ async def shorten(body: ShortenRequest) -> ShortenResponse:
             short_code = hash_generate(candidate_url)
             attempt += 1
     else:
-        # Base62 방식: Redis 카운터 → Base62 인코딩
+        # Base62 approach: Redis counter -> Base62 encoding
         uid = await next_id(redis_client)
         short_code = base62_encode(uid)
 
-    # Redis 에 저장
+    # Save to Redis
     await store.save(short_code, long_url)
 
     return ShortenResponse(
@@ -157,14 +158,14 @@ async def stats(short_code: str) -> StatsResponse:
 async def redirect(short_code: str) -> RedirectResponse:
     """Redirect short URL to the original long URL (301).
 
-    301 Moved Permanently: 브라우저가 리다이렉트를 캐시하므로 서버 부하가 줄어든다.
-    클릭 카운트는 Redis 에서 원자적으로 증가시킨다.
+    301 Moved Permanently: browser caches the redirect, reducing server load.
+    Click count is incremented atomically in Redis.
     """
     entry = await store.get_by_code(short_code)
     if not entry:
         raise HTTPException(status_code=404, detail="Short URL not found")
 
-    # 클릭 카운트 증가 (비동기, 리다이렉트 성능에 영향 없음)
+    # Increment click count (async, no impact on redirect performance)
     await store.increment_clicks(short_code)
 
     return RedirectResponse(url=entry.long_url, status_code=301)

@@ -15,7 +15,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "api"))
 
 
 @pytest_asyncio.fixture
-async def redis_client():
+async def redis_client() -> fakeredis.aioredis.FakeRedis:
     """Create a fake async Redis client for testing."""
     client = fakeredis.aioredis.FakeRedis(decode_responses=True)
     yield client
@@ -24,7 +24,7 @@ async def redis_client():
 
 
 @pytest.fixture
-def tmp_data_dir():
+def tmp_data_dir() -> str:
     """Create a temporary directory for data store tests."""
     with tempfile.TemporaryDirectory() as d:
         yield d

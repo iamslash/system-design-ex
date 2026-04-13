@@ -4,7 +4,7 @@ import pytest
 from src.state_machine import Command, CommandType, WalletStateMachine
 
 
-def test_create_wallet():
+def test_create_wallet() -> None:
     """CREATE_WALLET should produce a WALLET_CREATED event."""
     sm = WalletStateMachine()
     result = sm.handle(Command(CommandType.CREATE_WALLET, {"wallet_id": "w1", "owner": "alice"}))
@@ -15,7 +15,7 @@ def test_create_wallet():
     assert sm.wallets["w1"].owner == "alice"
 
 
-def test_duplicate_wallet():
+def test_duplicate_wallet() -> None:
     """Creating a wallet with the same ID should fail."""
     sm = WalletStateMachine()
     sm.handle(Command(CommandType.CREATE_WALLET, {"wallet_id": "w1", "owner": "alice"}))
@@ -25,7 +25,7 @@ def test_duplicate_wallet():
     assert "already exists" in result.error
 
 
-def test_deposit():
+def test_deposit() -> None:
     """DEPOSIT should increase wallet balance."""
     sm = WalletStateMachine()
     sm.handle(Command(CommandType.CREATE_WALLET, {"wallet_id": "w1", "owner": "alice"}))
@@ -35,7 +35,7 @@ def test_deposit():
     assert sm.wallets["w1"].balance == 5000
 
 
-def test_withdraw():
+def test_withdraw() -> None:
     """WITHDRAW should decrease wallet balance."""
     sm = WalletStateMachine()
     sm.handle(Command(CommandType.CREATE_WALLET, {"wallet_id": "w1", "owner": "alice"}))
@@ -46,7 +46,7 @@ def test_withdraw():
     assert sm.wallets["w1"].balance == 7000
 
 
-def test_withdraw_insufficient_funds():
+def test_withdraw_insufficient_funds() -> None:
     """WITHDRAW exceeding balance should fail."""
     sm = WalletStateMachine()
     sm.handle(Command(CommandType.CREATE_WALLET, {"wallet_id": "w1", "owner": "alice"}))
@@ -57,7 +57,7 @@ def test_withdraw_insufficient_funds():
     assert "Insufficient funds" in result.error
 
 
-def test_transfer():
+def test_transfer() -> None:
     """TRANSFER should move money between wallets atomically."""
     sm = WalletStateMachine()
     sm.handle(Command(CommandType.CREATE_WALLET, {"wallet_id": "w1", "owner": "alice"}))
@@ -74,7 +74,7 @@ def test_transfer():
     assert sm.wallets["w2"].balance == 4000
 
 
-def test_transfer_insufficient_funds():
+def test_transfer_insufficient_funds() -> None:
     """Transfer exceeding source balance should fail."""
     sm = WalletStateMachine()
     sm.handle(Command(CommandType.CREATE_WALLET, {"wallet_id": "w1", "owner": "alice"}))
@@ -90,7 +90,7 @@ def test_transfer_insufficient_funds():
     assert sm.wallets["w1"].balance == 1000  # unchanged
 
 
-def test_transfer_self():
+def test_transfer_self() -> None:
     """Transfer to the same wallet should fail."""
     sm = WalletStateMachine()
     sm.handle(Command(CommandType.CREATE_WALLET, {"wallet_id": "w1", "owner": "alice"}))
@@ -104,7 +104,7 @@ def test_transfer_self():
     assert result.success is False
 
 
-def test_snapshot_and_replay():
+def test_snapshot_and_replay() -> None:
     """State reconstructed from events should match the original."""
     sm = WalletStateMachine()
     sm.handle(Command(CommandType.CREATE_WALLET, {"wallet_id": "w1", "owner": "alice"}))
@@ -122,7 +122,7 @@ def test_snapshot_and_replay():
     assert replayed.wallets["w2"].balance == sm.wallets["w2"].balance
 
 
-def test_snapshot_restore():
+def test_snapshot_restore() -> None:
     """State restored from snapshot + subsequent events should be correct."""
     sm = WalletStateMachine()
     sm.handle(Command(CommandType.CREATE_WALLET, {"wallet_id": "w1", "owner": "alice"}))
@@ -137,7 +137,7 @@ def test_snapshot_restore():
     assert restored.wallets["w1"].balance == 8000
 
 
-def test_ledger_invariant():
+def test_ledger_invariant() -> None:
     """Ledger total balance should always be zero after any operation."""
     sm = WalletStateMachine()
     sm.handle(Command(CommandType.CREATE_WALLET, {"wallet_id": "w1", "owner": "alice"}))

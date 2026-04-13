@@ -16,12 +16,12 @@ import redis.asyncio as aioredis
 
 
 class MessageStore:
-    """Redis Sorted Set 기반 메시지 저장소.
+    """Redis Sorted Set-based message storage.
 
-    메시지를 채널별로 저장하며, 타임스탬프를 score 로 사용하여
-    시간순 정렬된 메시지 히스토리를 제공한다.
+    Messages are stored per channel using the timestamp as the score,
+    providing a time-ordered message history.
 
-    저장 구조:
+    Storage structure:
       - key: messages:{channel_id}
       - score: timestamp (float)
       - member: message JSON string
@@ -31,11 +31,11 @@ class MessageStore:
         self._redis = redis_client
 
     async def save_message(self, channel_id: str, message: dict[str, Any]) -> None:
-        """메시지를 Redis Sorted Set 에 저장한다.
+        """Save a message to a Redis Sorted Set.
 
         Args:
-            channel_id: 채널 식별자 (예: "dm:alice:bob", "group:team1")
-            message: 저장할 메시지 딕셔너리 (timestamp 포함)
+            channel_id: Channel identifier (e.g. "dm:alice:bob", "group:team1")
+            message: Message dictionary to store (must include a timestamp field)
         """
         key = f"messages:{channel_id}"
         ts = message.get("timestamp", 0)
@@ -44,30 +44,32 @@ class MessageStore:
     async def get_messages(
         self, channel_id: str, limit: int = 100, offset: int = 0
     ) -> list[dict[str, Any]]:
-        """채널의 최신 메시지를 조회한다.
+        """Retrieve the latest messages for a channel.
 
-        ZREVRANGE 를 사용하여 최신순으로 가져온 뒤 시간순(오래된 것 먼저)으로 반환한다.
+        Uses ZREVRANGE to fetch messages in reverse-chronological order, then
+        reverses the result so messages are returned in chronological order
+        (oldest first).
 
         Args:
-            channel_id: 채널 식별자
-            limit: 가져올 최대 메시지 수 (기본 100)
-            offset: 건너뛸 메시지 수 (페이지네이션)
+            channel_id: Channel identifier
+            limit: Maximum number of messages to return (default 100)
+            offset: Number of messages to skip for pagination
 
         Returns:
-            시간순 정렬된 메시지 리스트
+            List of messages sorted in chronological order
         """
         key = f"messages:{channel_id}"
         start = offset
         end = offset + limit - 1
         raw_messages = await self._redis.zrevrange(key, start, end)
-        # 최신순으로 가져왔으므로 역순으로 뒤집어 시간순 반환
+        # Fetched in reverse order, so reverse again to return chronologically
         messages = [json.loads(m) for m in reversed(raw_messages)]
         return messages
 
     async def get_max_message_id(self, channel_id: str) -> str | None:
-        """채널의 최신 메시지 ID 를 반환한다 (디바이스 간 동기화용).
+        """Return the latest message ID for a channel (used for cross-device sync).
 
-        클라이언트는 이 ID 이후의 메시지만 요청하여 중복 수신을 방지한다.
+        Clients request only messages after this ID to avoid receiving duplicates.
         """
         key = f"messages:{channel_id}"
         latest = await self._redis.zrevrange(key, 0, 0)

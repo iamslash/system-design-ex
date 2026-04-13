@@ -1,15 +1,15 @@
 """Video streaming with HTTP byte-range support.
 
-HTTP Range 요청을 지원하여 비디오 시킹(seeking)을 가능하게 한다.
-브라우저의 <video> 태그는 Range 헤더를 사용하여 특정 구간만 요청한다.
+Supports HTTP Range requests to enable video seeking.
+The browser's <video> tag uses Range headers to request only specific byte ranges.
 
-Range 요청 흐름:
-  1. 클라이언트: GET /stream?range=bytes=0-999999
-  2. 서버: 206 Partial Content + Content-Range: bytes 0-999999/5000000
-  3. 클라이언트: 사용자가 시킹 → GET /stream?range=bytes=3000000-3999999
-  4. 서버: 206 Partial Content + Content-Range: bytes 3000000-3999999/5000000
+Range request flow:
+  1. Client: GET /stream?range=bytes=0-999999
+  2. Server: 206 Partial Content + Content-Range: bytes 0-999999/5000000
+  3. Client: user seeks → GET /stream?range=bytes=3000000-3999999
+  4. Server: 206 Partial Content + Content-Range: bytes 3000000-3999999/5000000
 
-이 방식으로 전체 파일을 다운로드하지 않고도 원하는 구간을 재생할 수 있다.
+This allows playback of any desired range without downloading the entire file.
 """
 
 from __future__ import annotations
@@ -20,30 +20,30 @@ from typing import Any
 from config import settings
 
 
-# 기본 청크 크기: Range 헤더가 없을 때 전체 파일을 전송
+# Default chunk size: send entire file when no Range header is present
 DEFAULT_CHUNK_SIZE = 1024 * 1024  # 1MB
 
 
 def get_video_path(video_id: str, resolution: str = "720p") -> str | None:
-    """비디오 파일 경로를 반환한다.
+    """Return the video file path.
 
-    트랜스코딩된 파일 → 원본 순으로 탐색한다.
+    Searches in order: transcoded file → original.
 
     Args:
-        video_id: 비디오 ID
-        resolution: 요청 해상도 (기본: 720p)
+        video_id: Video ID
+        resolution: Requested resolution (default: 720p)
 
     Returns:
-        비디오 파일 경로, 없으면 None
+        Video file path, or None if not found
     """
-    # 트랜스코딩된 파일 우선 탐색
+    # Search transcoded file first
     transcoded_path = os.path.join(
         settings.VIDEO_STORAGE_PATH, "transcoded", video_id, f"{resolution}.mp4"
     )
     if os.path.exists(transcoded_path):
         return transcoded_path
 
-    # 원본 파일 폴백
+    # Fall back to original file
     original_path = os.path.join(
         settings.VIDEO_STORAGE_PATH, "originals", f"{video_id}.mp4"
     )
@@ -54,25 +54,25 @@ def get_video_path(video_id: str, resolution: str = "720p") -> str | None:
 
 
 def parse_range_header(range_header: str | None, file_size: int) -> tuple[int, int]:
-    """Range 헤더를 파싱하여 (start, end) 바이트 범위를 반환한다.
+    """Parse a Range header and return the (start, end) byte range.
 
-    지원하는 형식:
+    Supported formats:
       - bytes=0-999        → (0, 999)
       - bytes=500-         → (500, file_size-1)
       - bytes=-500         → (file_size-500, file_size-1)
-      - None (헤더 없음)   → (0, file_size-1)
+      - None (no header)   → (0, file_size-1)
 
     Args:
-        range_header: HTTP Range 헤더 값 (예: "bytes=0-999")
-        file_size: 전체 파일 크기
+        range_header: HTTP Range header value (e.g. "bytes=0-999")
+        file_size: Total file size
 
     Returns:
-        (start, end) 바이트 범위 (inclusive)
+        (start, end) byte range (inclusive)
     """
     if not range_header or not range_header.startswith("bytes="):
         return 0, file_size - 1
 
-    range_spec = range_header[6:]  # "bytes=" 제거
+    range_spec = range_header[6:]  # remove "bytes="
     parts = range_spec.split("-")
 
     if len(parts) != 2:
@@ -81,12 +81,12 @@ def parse_range_header(range_header: str | None, file_size: int) -> tuple[int, i
     start_str, end_str = parts
 
     if not start_str:
-        # bytes=-500 → 마지막 500바이트
+        # bytes=-500 → last 500 bytes
         suffix_length = int(end_str)
         start = max(0, file_size - suffix_length)
         end = file_size - 1
     elif not end_str:
-        # bytes=500- → 500부터 끝까지
+        # bytes=500- → from 500 to end
         start = int(start_str)
         end = file_size - 1
     else:
@@ -94,7 +94,7 @@ def parse_range_header(range_header: str | None, file_size: int) -> tuple[int, i
         start = int(start_str)
         end = min(int(end_str), file_size - 1)
 
-    # 범위 유효성 검증
+    # Validate range
     start = max(0, start)
     end = min(end, file_size - 1)
 
@@ -105,15 +105,15 @@ def parse_range_header(range_header: str | None, file_size: int) -> tuple[int, i
 
 
 def read_video_range(file_path: str, start: int, end: int) -> bytes:
-    """비디오 파일에서 지정된 바이트 범위를 읽는다.
+    """Read the specified byte range from a video file.
 
     Args:
-        file_path: 비디오 파일 경로
-        start: 시작 바이트 (inclusive)
-        end: 끝 바이트 (inclusive)
+        file_path: Video file path
+        start: Start byte (inclusive)
+        end: End byte (inclusive)
 
     Returns:
-        요청 범위의 바이트 데이터
+        Byte data for the requested range
     """
     with open(file_path, "rb") as f:
         f.seek(start)
@@ -125,14 +125,14 @@ def build_stream_response_info(
     file_path: str,
     range_header: str | None,
 ) -> dict[str, Any]:
-    """스트리밍 응답에 필요한 정보를 구성한다.
+    """Construct the information needed for a streaming response.
 
     Args:
-        file_path: 비디오 파일 경로
-        range_header: HTTP Range 헤더 값
+        file_path: Video file path
+        range_header: HTTP Range header value
 
     Returns:
-        status_code, headers, data 등의 응답 정보
+        Response info including status_code, headers, data
     """
     file_size = os.path.getsize(file_path)
     start, end = parse_range_header(range_header, file_size)
@@ -152,7 +152,7 @@ def build_stream_response_info(
             },
         }
     else:
-        # 200 OK — 전체 파일
+        # 200 OK — full file
         return {
             "status_code": 200,
             "data": data,

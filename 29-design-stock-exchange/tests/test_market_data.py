@@ -15,7 +15,7 @@ def make_execution(eid: str, price: float, qty: float) -> Execution:
 
 
 class TestCandlestickAggregator:
-    def test_single_trade(self):
+    def test_single_trade(self) -> None:
         """A single trade should create one in-progress candle."""
         agg = CandlestickAggregator(interval_seconds=60)
         agg.record_execution(make_execution("E1", 100.0, 50), timestamp=0.0)
@@ -26,7 +26,7 @@ class TestCandlestickAggregator:
         assert candle.close == 100.0
         assert candle.volume == 50
 
-    def test_ohlcv_update(self):
+    def test_ohlcv_update(self) -> None:
         """Multiple trades within the same interval should update OHLCV."""
         agg = CandlestickAggregator(interval_seconds=60)
         agg.record_execution(make_execution("E1", 100.0, 50), timestamp=0.0)
@@ -42,7 +42,7 @@ class TestCandlestickAggregator:
         assert candle.volume == 140
         assert candle.trade_count == 4
 
-    def test_candle_roll(self):
+    def test_candle_roll(self) -> None:
         """Trade beyond the interval should start a new candle."""
         agg = CandlestickAggregator(interval_seconds=60)
         agg.record_execution(make_execution("E1", 100.0, 50), timestamp=0.0)
@@ -57,7 +57,7 @@ class TestCandlestickAggregator:
         current = agg.get_current_candle("AAPL")
         assert current.open == 110.0
 
-    def test_flush(self):
+    def test_flush(self) -> None:
         """Flush should finalize in-progress candle."""
         agg = CandlestickAggregator(interval_seconds=60)
         agg.record_execution(make_execution("E1", 100.0, 50), timestamp=0.0)
@@ -69,7 +69,7 @@ class TestCandlestickAggregator:
 
 
 class TestMarketDataService:
-    def test_l1(self):
+    def test_l1(self) -> None:
         """L1 should reflect best bid/ask from order book."""
         book = OrderBook("AAPL")
         book.add_order(Order("B1", "AAPL", Side.BUY, 100.0, 500))
@@ -80,7 +80,7 @@ class TestMarketDataService:
         assert l1["best_bid"] == 100.0
         assert l1["best_ask"] == 101.0
 
-    def test_l2(self):
+    def test_l2(self) -> None:
         """L2 should show multiple depth levels."""
         book = OrderBook("AAPL")
         book.add_order(Order("B1", "AAPL", Side.BUY, 100.0, 500))
@@ -92,7 +92,7 @@ class TestMarketDataService:
         assert len(l2["bids"]) == 2
         assert len(l2["asks"]) == 1
 
-    def test_record_and_get_candles(self):
+    def test_record_and_get_candles(self) -> None:
         """Service should aggregate executions into candles."""
         mds = MarketDataService(interval_seconds=60)
         mds.record_execution(make_execution("E1", 100.0, 50), timestamp=0.0)

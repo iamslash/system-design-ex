@@ -6,6 +6,7 @@ import sys
 import os
 import time
 
+import fakeredis.aioredis
 import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "api"))
@@ -36,7 +37,7 @@ class TestTimeSeriesStorage:
     """Tests for Redis sorted-set time-series storage."""
 
     @pytest.mark.asyncio
-    async def test_add_and_query_single_point(self, redis_client) -> None:
+    async def test_add_and_query_single_point(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """A single stored point should be retrievable by range query."""
         storage = TimeSeriesStorage(redis_client)
         now = time.time()
@@ -47,7 +48,7 @@ class TestTimeSeriesStorage:
         assert points[0]["value"] == 0.75
 
     @pytest.mark.asyncio
-    async def test_add_multiple_points(self, redis_client) -> None:
+    async def test_add_multiple_points(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """Multiple points with different timestamps should all be stored."""
         storage = TimeSeriesStorage(redis_client)
         base = time.time()
@@ -58,7 +59,7 @@ class TestTimeSeriesStorage:
         assert len(points) == 5
 
     @pytest.mark.asyncio
-    async def test_query_range_filters_by_time(self, redis_client) -> None:
+    async def test_query_range_filters_by_time(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """Range query should only return points within [start, end]."""
         storage = TimeSeriesStorage(redis_client)
         base = 1000000.0
@@ -71,7 +72,7 @@ class TestTimeSeriesStorage:
         assert values == [3.0, 4.0, 5.0, 6.0]
 
     @pytest.mark.asyncio
-    async def test_query_latest(self, redis_client) -> None:
+    async def test_query_latest(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """query_latest should return the N most recent points."""
         storage = TimeSeriesStorage(redis_client)
         base = time.time()
@@ -83,7 +84,7 @@ class TestTimeSeriesStorage:
         assert latest[-1]["value"] == 9.0
 
     @pytest.mark.asyncio
-    async def test_label_isolation(self, redis_client) -> None:
+    async def test_label_isolation(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """Different label sets should be stored in separate time-series."""
         storage = TimeSeriesStorage(redis_client)
         now = time.time()
@@ -96,7 +97,7 @@ class TestTimeSeriesStorage:
         assert len(s2) == 1 and s2[0]["value"] == 0.9
 
     @pytest.mark.asyncio
-    async def test_batch_add(self, redis_client) -> None:
+    async def test_batch_add(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """Batch add should store all points efficiently."""
         storage = TimeSeriesStorage(redis_client)
         base = time.time()
@@ -108,7 +109,7 @@ class TestTimeSeriesStorage:
         assert len(points) == 5
 
     @pytest.mark.asyncio
-    async def test_list_metrics(self, redis_client) -> None:
+    async def test_list_metrics(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """list_metrics should return all known metric names."""
         storage = TimeSeriesStorage(redis_client)
         now = time.time()
@@ -120,7 +121,7 @@ class TestTimeSeriesStorage:
         assert "mem.used" in names
 
     @pytest.mark.asyncio
-    async def test_delete_range(self, redis_client) -> None:
+    async def test_delete_range(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """delete_range should remove points within the given window."""
         storage = TimeSeriesStorage(redis_client)
         base = 2000000.0
@@ -143,7 +144,7 @@ class TestDownsampling:
     """Tests for time-series downsampling."""
 
     @pytest.mark.asyncio
-    async def test_downsample_basic(self, redis_client) -> None:
+    async def test_downsample_basic(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """Downsampling should aggregate points into fixed buckets."""
         storage = TimeSeriesStorage(redis_client)
         # Use a base aligned to a 60s boundary to get predictable buckets
@@ -161,7 +162,7 @@ class TestDownsampling:
         assert buckets[0]["min"] == 1.0
 
     @pytest.mark.asyncio
-    async def test_downsample_single_bucket(self, redis_client) -> None:
+    async def test_downsample_single_bucket(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """All points in one bucket should produce a single result."""
         storage = TimeSeriesStorage(redis_client)
         base = 1000000.0
@@ -174,7 +175,7 @@ class TestDownsampling:
         assert buckets[0]["sum"] == pytest.approx(406.0)
 
     @pytest.mark.asyncio
-    async def test_downsample_empty(self, redis_client) -> None:
+    async def test_downsample_empty(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """Downsampling with no data should return empty."""
         storage = TimeSeriesStorage(redis_client)
         buckets = await storage.downsample("nonexistent", {}, bucket_seconds=60, start=0, end=9999999)
@@ -190,7 +191,7 @@ class TestMetricsCollector:
     """Tests for the push-based metrics collector."""
 
     @pytest.mark.asyncio
-    async def test_push_single(self, redis_client) -> None:
+    async def test_push_single(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """Pushing a single metric should store it."""
         storage = TimeSeriesStorage(redis_client)
         collector = MetricsCollector(storage)
@@ -203,7 +204,7 @@ class TestMetricsCollector:
         assert data[0]["value"] == 0.75
 
     @pytest.mark.asyncio
-    async def test_push_batch(self, redis_client) -> None:
+    async def test_push_batch(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """Pushing a batch should store all points."""
         storage = TimeSeriesStorage(redis_client)
         collector = MetricsCollector(storage)
@@ -216,7 +217,7 @@ class TestMetricsCollector:
         assert count == 5
 
     @pytest.mark.asyncio
-    async def test_push_auto_timestamp(self, redis_client) -> None:
+    async def test_push_auto_timestamp(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """Omitting timestamp should auto-fill with current time."""
         storage = TimeSeriesStorage(redis_client)
         collector = MetricsCollector(storage)
@@ -239,7 +240,7 @@ class TestQueryService:
     """Tests for the query service with aggregation."""
 
     @pytest.mark.asyncio
-    async def test_query_avg(self, redis_client) -> None:
+    async def test_query_avg(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """AVG aggregation should compute the mean."""
         storage = TimeSeriesStorage(redis_client)
         qs = QueryService(storage)
@@ -252,7 +253,7 @@ class TestQueryService:
         assert result.aggregated_value == pytest.approx(20.0)
 
     @pytest.mark.asyncio
-    async def test_query_max(self, redis_client) -> None:
+    async def test_query_max(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """MAX aggregation should return the highest value."""
         storage = TimeSeriesStorage(redis_client)
         qs = QueryService(storage)
@@ -265,7 +266,7 @@ class TestQueryService:
         assert result.aggregated_value == 15.0
 
     @pytest.mark.asyncio
-    async def test_query_min(self, redis_client) -> None:
+    async def test_query_min(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """MIN aggregation should return the lowest value."""
         storage = TimeSeriesStorage(redis_client)
         qs = QueryService(storage)
@@ -278,7 +279,7 @@ class TestQueryService:
         assert result.aggregated_value == 5.0
 
     @pytest.mark.asyncio
-    async def test_query_sum(self, redis_client) -> None:
+    async def test_query_sum(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """SUM aggregation should add all values."""
         storage = TimeSeriesStorage(redis_client)
         qs = QueryService(storage)
@@ -291,7 +292,7 @@ class TestQueryService:
         assert result.aggregated_value == pytest.approx(6.0)
 
     @pytest.mark.asyncio
-    async def test_query_count(self, redis_client) -> None:
+    async def test_query_count(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """COUNT aggregation should return the number of points."""
         storage = TimeSeriesStorage(redis_client)
         qs = QueryService(storage)
@@ -304,7 +305,7 @@ class TestQueryService:
         assert result.aggregated_value == 4.0
 
     @pytest.mark.asyncio
-    async def test_query_with_downsample(self, redis_client) -> None:
+    async def test_query_with_downsample(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """Query with downsample should return bucketed results."""
         storage = TimeSeriesStorage(redis_client)
         qs = QueryService(storage)
@@ -327,7 +328,7 @@ class TestAlertRules:
     """Tests for alert rule engine."""
 
     @pytest.mark.asyncio
-    async def test_add_and_list_rules(self, redis_client) -> None:
+    async def test_add_and_list_rules(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """Rules should be persistable and listable."""
         storage = TimeSeriesStorage(redis_client)
         engine = AlertRuleEngine(redis_client, storage)
@@ -346,7 +347,7 @@ class TestAlertRules:
         assert rules[0].name == "High CPU"
 
     @pytest.mark.asyncio
-    async def test_delete_rule(self, redis_client) -> None:
+    async def test_delete_rule(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """Deleting a rule should remove it."""
         storage = TimeSeriesStorage(redis_client)
         engine = AlertRuleEngine(redis_client, storage)
@@ -362,7 +363,7 @@ class TestAlertRules:
         assert len(await engine.list_rules()) == 0
 
     @pytest.mark.asyncio
-    async def test_rule_fires_on_threshold_breach(self, redis_client) -> None:
+    async def test_rule_fires_on_threshold_breach(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """An alert should fire when the metric exceeds the threshold."""
         storage = TimeSeriesStorage(redis_client)
         engine = AlertRuleEngine(redis_client, storage)
@@ -388,7 +389,7 @@ class TestAlertRules:
         assert alert.value > 0.8
 
     @pytest.mark.asyncio
-    async def test_rule_does_not_fire_below_threshold(self, redis_client) -> None:
+    async def test_rule_does_not_fire_below_threshold(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """No alert when metric is below threshold."""
         storage = TimeSeriesStorage(redis_client)
         engine = AlertRuleEngine(redis_client, storage)
@@ -407,7 +408,7 @@ class TestAlertRules:
         assert alert is None
 
     @pytest.mark.asyncio
-    async def test_evaluate_all(self, redis_client) -> None:
+    async def test_evaluate_all(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """evaluate_all should check every registered rule."""
         storage = TimeSeriesStorage(redis_client)
         engine = AlertRuleEngine(redis_client, storage)
@@ -429,7 +430,7 @@ class TestAlertRules:
         assert len(fired) == 2
 
     @pytest.mark.asyncio
-    async def test_resolve_alert(self, redis_client) -> None:
+    async def test_resolve_alert(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """Resolving an alert should update its status."""
         storage = TimeSeriesStorage(redis_client)
         engine = AlertRuleEngine(redis_client, storage)
@@ -459,7 +460,7 @@ class TestAlertTriggering:
     """Tests for alert notification delivery."""
 
     @pytest.mark.asyncio
-    async def test_notify_email(self, redis_client) -> None:
+    async def test_notify_email(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """Email notification should be recorded."""
         storage = TimeSeriesStorage(redis_client)
         engine = AlertRuleEngine(redis_client, storage)
@@ -481,7 +482,7 @@ class TestAlertTriggering:
         assert records[0]["channel"] == "email"
 
     @pytest.mark.asyncio
-    async def test_notify_multiple_channels(self, redis_client) -> None:
+    async def test_notify_multiple_channels(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """Notifications should go to all configured channels."""
         storage = TimeSeriesStorage(redis_client)
         engine = AlertRuleEngine(redis_client, storage)
@@ -504,7 +505,7 @@ class TestAlertTriggering:
         assert channels == {"email", "webhook", "slack"}
 
     @pytest.mark.asyncio
-    async def test_notification_history(self, redis_client) -> None:
+    async def test_notification_history(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """Sent notifications should be retrievable from history."""
         storage = TimeSeriesStorage(redis_client)
         engine = AlertRuleEngine(redis_client, storage)

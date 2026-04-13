@@ -9,6 +9,7 @@ import os
 import time
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import fakeredis.aioredis
 import pytest
 
 # Add the server directory to the path so we can import modules.
@@ -185,7 +186,7 @@ class TestMessageStore:
     """Tests for message persistence in Redis."""
 
     @pytest.mark.asyncio
-    async def test_save_and_retrieve(self, redis_client) -> None:
+    async def test_save_and_retrieve(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """Saved messages should be retrievable."""
         store = MessageStore(redis_client)
         msg = {"message_id": "100-0", "from": "alice", "content": "hello", "timestamp": 100.0}
@@ -196,7 +197,7 @@ class TestMessageStore:
         assert messages[0]["content"] == "hello"
 
     @pytest.mark.asyncio
-    async def test_message_ordering(self, redis_client) -> None:
+    async def test_message_ordering(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """Messages should be returned in chronological order."""
         store = MessageStore(redis_client)
         for i in range(5):
@@ -210,7 +211,7 @@ class TestMessageStore:
         assert messages[4]["content"] == "msg4"
 
     @pytest.mark.asyncio
-    async def test_message_limit(self, redis_client) -> None:
+    async def test_message_limit(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """Should respect the limit parameter."""
         store = MessageStore(redis_client)
         for i in range(10):
@@ -221,7 +222,7 @@ class TestMessageStore:
         assert len(messages) == 3
 
     @pytest.mark.asyncio
-    async def test_get_max_message_id(self, redis_client) -> None:
+    async def test_get_max_message_id(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """Should return the latest message ID."""
         store = MessageStore(redis_client)
         for i in range(5):
@@ -232,14 +233,14 @@ class TestMessageStore:
         assert max_id == "104-0"
 
     @pytest.mark.asyncio
-    async def test_empty_channel(self, redis_client) -> None:
+    async def test_empty_channel(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """Empty channel should return empty list."""
         store = MessageStore(redis_client)
         messages = await store.get_messages("dm:nobody:here")
         assert messages == []
 
     @pytest.mark.asyncio
-    async def test_max_message_id_empty_channel(self, redis_client) -> None:
+    async def test_max_message_id_empty_channel(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """Empty channel should return None for max message ID."""
         store = MessageStore(redis_client)
         max_id = await store.get_max_message_id("dm:nobody:here")
@@ -255,7 +256,7 @@ class TestPresenceTracker:
     """Tests for the heartbeat-based presence tracker."""
 
     @pytest.mark.asyncio
-    async def test_set_online(self, redis_client) -> None:
+    async def test_set_online(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """User should be online after set_online."""
         tracker = PresenceTracker(redis_client)
         await tracker.set_online("alice")
@@ -264,7 +265,7 @@ class TestPresenceTracker:
         assert status["last_heartbeat"] is not None
 
     @pytest.mark.asyncio
-    async def test_set_offline(self, redis_client) -> None:
+    async def test_set_offline(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """User should be offline after set_offline."""
         tracker = PresenceTracker(redis_client)
         await tracker.set_online("alice")
@@ -273,7 +274,7 @@ class TestPresenceTracker:
         assert status["status"] == "offline"
 
     @pytest.mark.asyncio
-    async def test_heartbeat_keeps_online(self, redis_client) -> None:
+    async def test_heartbeat_keeps_online(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """Heartbeat should refresh last_heartbeat timestamp."""
         tracker = PresenceTracker(redis_client)
         await tracker.set_online("alice")
@@ -287,7 +288,7 @@ class TestPresenceTracker:
         assert status2["last_heartbeat"] >= status1["last_heartbeat"]
 
     @pytest.mark.asyncio
-    async def test_timeout_marks_offline(self, redis_client) -> None:
+    async def test_timeout_marks_offline(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """User should be marked offline after heartbeat timeout."""
         # Create tracker with very short timeout
         tracker = PresenceTracker(redis_client)
@@ -300,7 +301,7 @@ class TestPresenceTracker:
         assert status["status"] == "offline"
 
     @pytest.mark.asyncio
-    async def test_unknown_user_is_offline(self, redis_client) -> None:
+    async def test_unknown_user_is_offline(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """Unknown user should be reported as offline."""
         tracker = PresenceTracker(redis_client)
         status = await tracker.get_status("nobody")
@@ -317,7 +318,7 @@ class TestMessageHandler:
     """Tests for message routing logic."""
 
     @pytest.mark.asyncio
-    async def test_dm_routing(self, redis_client) -> None:
+    async def test_dm_routing(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """1:1 message should be stored and delivered to recipient."""
         cm = ConnectionManager()
         ws_bob = AsyncMock()
@@ -343,7 +344,7 @@ class TestMessageHandler:
         cm.disconnect("bob", ws_bob)
 
     @pytest.mark.asyncio
-    async def test_group_routing(self, redis_client) -> None:
+    async def test_group_routing(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """Group message should be delivered to all members."""
         cm = ConnectionManager()
         ws_alice = AsyncMock()
@@ -380,7 +381,7 @@ class TestMessageHandler:
         cm.disconnect("charlie", ws_charlie)
 
     @pytest.mark.asyncio
-    async def test_group_not_found(self, redis_client) -> None:
+    async def test_group_not_found(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """Non-existent group should return None."""
         cm = ConnectionManager()
         store = MessageStore(redis_client)
@@ -390,7 +391,7 @@ class TestMessageHandler:
         assert result is None
 
     @pytest.mark.asyncio
-    async def test_dm_persisted_in_correct_channel(self, redis_client) -> None:
+    async def test_dm_persisted_in_correct_channel(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """DM should be stored under the canonicalized channel ID."""
         cm = ConnectionManager()
         store = MessageStore(redis_client)
@@ -408,7 +409,7 @@ class TestMessageHandler:
         assert messages[0]["content"] == "Hello!"
 
     @pytest.mark.asyncio
-    async def test_dm_sender_receives_copy(self, redis_client) -> None:
+    async def test_dm_sender_receives_copy(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """Sender should also receive a copy (for multi-device sync)."""
         cm = ConnectionManager()
         ws_alice = AsyncMock()

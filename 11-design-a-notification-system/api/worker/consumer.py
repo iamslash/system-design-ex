@@ -1,9 +1,9 @@
 """Queue consumer (worker) — pulls messages from Redis queues and sends via channel handlers.
 
-각 채널 큐(queue:push, queue:sms, queue:email)에서 BRPOP 으로 메시지를 꺼내
-해당 채널 핸들러를 통해 전송한다.
-실패 시 exponential backoff 로 재시도하며, 최대 MAX_RETRIES 회까지 시도한다.
-중복 처리 방지를 위해 notification_id 를 확인한다.
+Uses BRPOP to dequeue messages from each channel queue (queue:push, queue:sms, queue:email)
+and delivers them via the corresponding channel handler.
+On failure, retries with exponential backoff up to MAX_RETRIES times.
+Checks notification_id to prevent duplicate processing.
 """
 
 from __future__ import annotations
@@ -24,14 +24,14 @@ from config import settings
 
 logger = logging.getLogger(__name__)
 
-# 채널별 전송 함수 매핑
+# Mapping of channel names to their send functions
 CHANNEL_HANDLERS = {
     "push": send_push,
     "sms": send_sms,
     "email": send_email,
 }
 
-# 모니터링할 큐 목록
+# List of queues to monitor
 QUEUES = ["queue:push", "queue:sms", "queue:email"]
 
 
@@ -41,7 +41,7 @@ async def update_notification_status(
     status: str,
     retry_count: int | None = None,
 ) -> None:
-    """Redis 에 저장된 알림 레코드의 상태를 갱신한다."""
+    """Update the status of a notification record stored in Redis."""
     key = f"notification:{notification_id}"
     updates: dict[str, Any] = {
         "status": status,
@@ -53,22 +53,22 @@ async def update_notification_status(
 
 
 async def is_duplicate(redis: Redis, notification_id: str) -> bool:
-    """이미 처리 완료(sent/delivered)된 알림인지 확인한다 (중복 방지)."""
+    """Check whether a notification has already been processed (sent/delivered) to prevent duplicates."""
     key = f"notification:{notification_id}"
     status = await redis.hget(key, "status")
     return status in ("sent", "delivered")
 
 
 async def process_message(redis: Redis, raw_message: str) -> None:
-    """큐에서 꺼낸 메시지 하나를 처리한다.
+    """Process a single message dequeued from a channel queue.
 
-    처리 흐름:
-      1. 메시지 파싱
-      2. 중복 확인 (이미 sent/delivered 이면 스킵)
-      3. 채널 핸들러 호출
-      4. 성공 → 상태를 sent 로 갱신
-      5. 실패 → retry_count < MAX_RETRIES 이면 exponential backoff 후 재큐잉
-              → 초과 시 상태를 failed 로 갱신
+    Processing flow:
+      1. Parse the message
+      2. Check for duplicates (skip if already sent/delivered)
+      3. Call the channel handler
+      4. On success — update status to sent
+      5. On failure — if retry_count < MAX_RETRIES, wait with exponential backoff and requeue
+                    — if exceeded, update status to failed
     """
     message: dict[str, Any] = json.loads(raw_message)
     notification_id = message["notification_id"]
@@ -78,7 +78,7 @@ async def process_message(redis: Redis, raw_message: str) -> None:
     body = message["body"]
     retry_count = message.get("retry_count", 0)
 
-    # 1. 중복 확인
+    # 1. Check for duplicate
     if await is_duplicate(redis, notification_id):
         logger.info(
             "Skipping duplicate notification %s (already processed)",
@@ -86,7 +86,7 @@ async def process_message(redis: Redis, raw_message: str) -> None:
         )
         return
 
-    # 2. 채널 핸들러 호출
+    # 2. Call the channel handler
     handler = CHANNEL_HANDLERS.get(channel)
     if handler is None:
         logger.error("Unknown channel: %s", channel)
@@ -96,9 +96,9 @@ async def process_message(redis: Redis, raw_message: str) -> None:
     success = await handler(user_id, title, body)
 
     if success:
-        # 3a. 전송 성공
+        # 3a. Send succeeded
         await update_notification_status(redis, notification_id, "sent", retry_count)
-        # 이벤트 추적: sent 타임스탬프 기록
+        # Event tracking: record sent timestamp
         await redis.hset(
             f"notification:{notification_id}",
             "sent_at",
@@ -106,10 +106,10 @@ async def process_message(redis: Redis, raw_message: str) -> None:
         )
         logger.info("Notification %s sent successfully", notification_id)
     else:
-        # 3b. 전송 실패 → retry 또는 failed
+        # 3b. Send failed — retry or mark as failed
         retry_count += 1
         if retry_count <= settings.MAX_RETRIES:
-            # Exponential backoff: 2^(retry_count-1) 초 대기 후 재큐잉
+            # Exponential backoff: wait 2^(retry_count-1) seconds before requeuing
             backoff = 2 ** (retry_count - 1)
             logger.warning(
                 "Notification %s failed (attempt %d/%d), retrying in %ds...",
@@ -122,11 +122,11 @@ async def process_message(redis: Redis, raw_message: str) -> None:
                 redis, notification_id, "pending", retry_count
             )
             await asyncio.sleep(backoff)
-            # 재큐잉: retry_count 를 증가시켜 다시 큐에 넣음
+            # Requeue: increment retry_count and push back to the queue
             message["retry_count"] = retry_count
             await redis.lpush(f"queue:{channel}", json.dumps(message))
         else:
-            # 최대 재시도 초과 → failed
+            # Max retries exceeded — mark as failed
             logger.error(
                 "Notification %s failed after %d retries, marking as failed",
                 notification_id,
@@ -138,18 +138,18 @@ async def process_message(redis: Redis, raw_message: str) -> None:
 
 
 async def consume_queues(redis: Redis) -> None:
-    """모든 채널 큐에서 메시지를 지속적으로 소비하는 워커 루프.
+    """Worker loop that continuously consumes messages from all channel queues.
 
-    BRPOP 으로 블로킹 대기하며, 메시지가 도착하면 process_message 를 호출한다.
-    API 서비스 내 백그라운드 태스크로 실행된다.
+    Blocks on BRPOP waiting for messages, then calls process_message when one arrives.
+    Runs as a background task within the API service.
     """
     logger.info("Worker started — listening on queues: %s", QUEUES)
     while True:
         try:
-            # BRPOP: 여러 큐를 동시에 모니터링, timeout 초 대기
+            # BRPOP: monitor multiple queues simultaneously, wait up to timeout seconds
             result = await redis.brpop(QUEUES, timeout=settings.WORKER_POLL_INTERVAL)
             if result is None:
-                # 타임아웃 — 메시지 없음, 다시 대기
+                # Timeout — no message, wait again
                 continue
             _queue_name, raw_message = result
             await process_message(redis, raw_message)

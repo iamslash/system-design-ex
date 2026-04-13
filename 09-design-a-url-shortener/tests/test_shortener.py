@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import sys
 
+import fakeredis.aioredis
 import pytest
 
 # Add the api directory to the path so we can import modules.
@@ -140,13 +141,13 @@ class TestIdGenerator:
     """Tests for counter-based ID generator."""
 
     @pytest.mark.asyncio
-    async def test_first_id(self, redis_client) -> None:
+    async def test_first_id(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """First ID should be START_VALUE + 1."""
         uid = await next_id(redis_client)
         assert uid == START_VALUE + 1
 
     @pytest.mark.asyncio
-    async def test_sequential_ids(self, redis_client) -> None:
+    async def test_sequential_ids(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """IDs should be sequential."""
         id1 = await next_id(redis_client)
         id2 = await next_id(redis_client)
@@ -155,7 +156,7 @@ class TestIdGenerator:
         assert id3 == id2 + 1
 
     @pytest.mark.asyncio
-    async def test_ids_are_unique(self, redis_client) -> None:
+    async def test_ids_are_unique(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """All generated IDs should be unique."""
         ids = set()
         for _ in range(100):
@@ -173,7 +174,7 @@ class TestRedisURLStore:
     """Tests for Redis-based URL storage."""
 
     @pytest.mark.asyncio
-    async def test_save_and_get(self, redis_client) -> None:
+    async def test_save_and_get(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """Saving a URL and retrieving by code should work."""
         store = RedisURLStore(redis_client)
         entry = await store.save("abc1234", "https://www.example.com")
@@ -187,14 +188,14 @@ class TestRedisURLStore:
         assert retrieved.long_url == "https://www.example.com"
 
     @pytest.mark.asyncio
-    async def test_get_nonexistent(self, redis_client) -> None:
+    async def test_get_nonexistent(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """Getting a non-existent code should return None."""
         store = RedisURLStore(redis_client)
         result = await store.get_by_code("nonexistent")
         assert result is None
 
     @pytest.mark.asyncio
-    async def test_deduplication(self, redis_client) -> None:
+    async def test_deduplication(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """Same long URL should be mapped to the same short code."""
         store = RedisURLStore(redis_client)
         url = "https://www.example.com/dedup-test"
@@ -206,7 +207,7 @@ class TestRedisURLStore:
         assert existing == "code1"
 
     @pytest.mark.asyncio
-    async def test_click_counting(self, redis_client) -> None:
+    async def test_click_counting(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """Click count should increment on each call."""
         store = RedisURLStore(redis_client)
         await store.save("click1", "https://www.example.com")
@@ -222,7 +223,7 @@ class TestRedisURLStore:
         assert entry.clicks == 3
 
     @pytest.mark.asyncio
-    async def test_code_exists(self, redis_client) -> None:
+    async def test_code_exists(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """code_exists should return True for saved codes."""
         store = RedisURLStore(redis_client)
         assert not await store.code_exists("new_code")
@@ -240,7 +241,7 @@ class TestShortenFlow:
     """Integration tests for the full shorten + retrieve flow."""
 
     @pytest.mark.asyncio
-    async def test_base62_shorten_and_retrieve(self, redis_client) -> None:
+    async def test_base62_shorten_and_retrieve(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """Base62 approach: shorten a URL and retrieve it."""
         store = RedisURLStore(redis_client)
 
@@ -258,7 +259,7 @@ class TestShortenFlow:
         assert entry.long_url == "https://www.example.com/long/path"
 
     @pytest.mark.asyncio
-    async def test_dedup_returns_same_code(self, redis_client) -> None:
+    async def test_dedup_returns_same_code(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """Shortening the same URL twice should return the same code."""
         store = RedisURLStore(redis_client)
         url = "https://www.example.com/same"
@@ -270,7 +271,7 @@ class TestShortenFlow:
         assert existing == "first_code"
 
     @pytest.mark.asyncio
-    async def test_stats_after_clicks(self, redis_client) -> None:
+    async def test_stats_after_clicks(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """Stats should reflect click count after redirects."""
         store = RedisURLStore(redis_client)
         await store.save("stat1", "https://www.example.com")
@@ -283,7 +284,7 @@ class TestShortenFlow:
         assert entry.clicks == 5
 
     @pytest.mark.asyncio
-    async def test_nonexistent_code_returns_none(self, redis_client) -> None:
+    async def test_nonexistent_code_returns_none(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """Looking up a non-existent short code should return None."""
         store = RedisURLStore(redis_client)
         entry = await store.get_by_code("XXXXXXX")

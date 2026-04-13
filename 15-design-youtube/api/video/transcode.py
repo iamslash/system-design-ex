@@ -1,12 +1,12 @@
 """Video transcoding simulation with DAG model.
 
-실제 트랜스코딩 파이프라인은 DAG(Directed Acyclic Graph) 형태로 구성된다:
+The actual transcoding pipeline is structured as a DAG (Directed Acyclic Graph):
 
-    원본 비디오
+    Original Video
         │
         ▼
     ┌─────────┐
-    │  Split   │  ── 비디오를 세그먼트로 분할
+    │  Split   │  ── Split video into segments
     └────┬────┘
          │
     ┌────┴────────────────┬──────────────┐
@@ -20,11 +20,11 @@
      ▼              ▼                   ▼
     ┌─────────────────────────────────────┐
     │            Assemble                  │
-    │  다양한 해상도 + 썸네일 + 워터마크    │
+    │  Multiple resolutions + thumbnail + watermark    │
     └──────────────────────────────────────┘
 
-이 시뮬레이션에서는 실제 인코딩 대신 각 해상도별로
-텍스트 파일을 생성하여 파이프라인 단계를 보여준다.
+In this simulation, text files are created for each resolution
+instead of actual encoding to illustrate the pipeline stages.
 """
 
 from __future__ import annotations
@@ -39,26 +39,26 @@ from config import settings
 
 
 # ---------------------------------------------------------------------------
-# DAG 노드 정의 — 각 단계는 독립적 태스크이다
+# DAG node definitions — each stage is an independent task
 # ---------------------------------------------------------------------------
 
 
 def _dag_split(source_path: str, work_dir: str) -> dict[str, Any]:
-    """Split 단계: 원본 비디오를 세그먼트로 분할한다.
+    """Split stage: split the original video into segments.
 
-    실제로는 GOP(Group of Pictures) 단위로 비디오를 분할한다.
-    시뮬레이션에서는 원본 파일의 내용을 읽어 작업 디렉토리에 복사한다.
+    In a real system, the video is split in GOP (Group of Pictures) units.
+    In this simulation, the original file contents are read and copied to the work directory.
     """
     split_dir = os.path.join(work_dir, "segments")
     os.makedirs(split_dir, exist_ok=True)
 
-    # 원본 파일 내용 읽기
+    # Read original file contents
     content = b""
     if os.path.exists(source_path):
         with open(source_path, "rb") as f:
             content = f.read()
 
-    # 세그먼트로 분할 (시뮬레이션: 단일 세그먼트)
+    # Split into segments (simulation: single segment)
     segment_path = os.path.join(split_dir, "segment_000.dat")
     with open(segment_path, "wb") as f:
         f.write(content)
@@ -75,19 +75,19 @@ def _dag_encode(
     work_dir: str,
     resolution: str,
 ) -> dict[str, Any]:
-    """Encode 단계: 세그먼트를 특정 해상도로 인코딩한다.
+    """Encode stage: encode segments to a specific resolution.
 
-    실제로는 H.264/H.265 코덱으로 인코딩한다:
-      - 컨테이너 포맷: MP4, HLS(.m3u8 + .ts), DASH(.mpd)
-      - 비디오 코덱: H.264 (호환성), H.265/HEVC (효율성), VP9, AV1
-      - 오디오 코덱: AAC, Opus
+    In a real system, encodes with H.264/H.265 codec:
+      - Container formats: MP4, HLS (.m3u8 + .ts), DASH (.mpd)
+      - Video codecs: H.264 (compatibility), H.265/HEVC (efficiency), VP9, AV1
+      - Audio codecs: AAC, Opus
 
-    시뮬레이션에서는 해상도 정보가 포함된 텍스트 파일을 생성한다.
+    In this simulation, a text file containing resolution info is created.
     """
     encode_dir = os.path.join(work_dir, "encoded")
     os.makedirs(encode_dir, exist_ok=True)
 
-    # 해상도별 비트레이트 매핑 (실제 시스템)
+    # Bitrate mapping per resolution (real system)
     bitrate_map = {
         "360p": "800kbps",
         "720p": "2500kbps",
@@ -96,7 +96,7 @@ def _dag_encode(
 
     encoded_path = os.path.join(encode_dir, f"video_{resolution}.mp4")
 
-    # 원본 세그먼트 내용을 기반으로 인코딩된 파일 생성
+    # Create encoded file based on original segment contents
     original_content = b""
     for seg in segments:
         if os.path.exists(seg):
@@ -124,10 +124,10 @@ def _dag_encode(
 
 
 def _dag_thumbnail(source_path: str, work_dir: str) -> dict[str, Any]:
-    """Thumbnail 단계: 비디오에서 썸네일 이미지를 추출한다.
+    """Thumbnail stage: extract a thumbnail image from the video.
 
-    실제로는 비디오의 특정 프레임을 추출하여 JPEG/WebP 로 저장한다.
-    시뮬레이션에서는 텍스트 파일로 썸네일을 생성한다.
+    In a real system, a specific frame is extracted from the video and saved as JPEG/WebP.
+    In this simulation, a text file is created as the thumbnail.
     """
     thumb_dir = os.path.join(work_dir, "thumbnails")
     os.makedirs(thumb_dir, exist_ok=True)
@@ -143,10 +143,10 @@ def _dag_thumbnail(source_path: str, work_dir: str) -> dict[str, Any]:
 
 
 def _dag_watermark(encoded_paths: list[str], work_dir: str) -> dict[str, Any]:
-    """Watermark 단계: 인코딩된 비디오에 워터마크를 오버레이한다.
+    """Watermark stage: overlay a watermark on encoded videos.
 
-    DRM/저작권 보호의 일환으로 비디오에 워터마크를 삽입한다.
-    시뮬레이션에서는 워터마크 메타데이터를 기록한다.
+    Watermark is embedded in the video as part of DRM/copyright protection.
+    In this simulation, watermark metadata is recorded.
     """
     watermark_dir = os.path.join(work_dir, "watermarked")
     os.makedirs(watermark_dir, exist_ok=True)
@@ -171,17 +171,17 @@ def _dag_assemble(
     video_id: str,
     resolutions: list[str],
 ) -> dict[str, Any]:
-    """Assemble 단계: 모든 산출물을 최종 디렉토리로 취합한다.
+    """Assemble stage: collect all outputs into the final directory.
 
-    인코딩된 비디오, 썸네일, 워터마크 정보를 비디오 ID 디렉토리에 모은다.
-    실제로는 CDN 에 업로드하는 단계이기도 하다.
+    Gathers encoded videos, thumbnails, and watermark info into the video ID directory.
+    In a real system, this stage also uploads to a CDN.
     """
     video_output_dir = os.path.join(output_dir, video_id)
     os.makedirs(video_output_dir, exist_ok=True)
 
     assembled_files: list[str] = []
 
-    # 인코딩된 파일 복사
+    # Copy encoded files
     encode_dir = os.path.join(work_dir, "encoded")
     for res in resolutions:
         src = os.path.join(encode_dir, f"video_{res}.mp4")
@@ -191,7 +191,7 @@ def _dag_assemble(
                 df.write(sf.read())
             assembled_files.append(dst)
 
-    # 썸네일 복사
+    # Copy thumbnail
     thumb_src = os.path.join(work_dir, "thumbnails", "thumbnail.jpg")
     thumb_dst = os.path.join(video_output_dir, "thumbnail.jpg")
     if os.path.exists(thumb_src):
@@ -207,7 +207,7 @@ def _dag_assemble(
 
 
 # ---------------------------------------------------------------------------
-# DAG 실행기 — 전체 파이프라인을 순서대로 실행한다
+# DAG executor — runs the full pipeline in order
 # ---------------------------------------------------------------------------
 
 
@@ -216,32 +216,32 @@ async def transcode_video(
     video_id: str,
     source_path: str,
 ) -> dict[str, Any]:
-    """DAG 기반 트랜스코딩 파이프라인을 실행한다.
+    """Execute the DAG-based transcoding pipeline.
 
-    파이프라인 단계:
-      1. Split   — 원본을 세그먼트로 분할
-      2. Encode  — 각 해상도(360p, 720p, 1080p)로 병렬 인코딩
-      3. Thumbnail — 썸네일 추출 (Encode 와 병렬)
-      4. Watermark — 워터마크 삽입
-      5. Assemble  — 최종 산출물 취합
+    Pipeline stages:
+      1. Split   — split original into segments
+      2. Encode  — parallel encoding at each resolution (360p, 720p, 1080p)
+      3. Thumbnail — extract thumbnail (can run in parallel with Encode)
+      4. Watermark — apply watermark
+      5. Assemble  — collect final outputs
 
     Args:
-        redis: Redis 클라이언트
-        video_id: 비디오 ID
-        source_path: 원본 비디오 파일 경로
+        redis: Redis client
+        video_id: Video ID
+        source_path: Path to the original video file
 
     Returns:
-        트랜스코딩 결과 (해상도 목록, 파일 경로 등)
+        Transcoding result (resolution list, file paths, etc.)
     """
     resolutions = settings.TRANSCODE_RESOLUTIONS
 
-    # 작업 디렉토리 설정
+    # Set up work directory
     work_dir = os.path.join(settings.VIDEO_STORAGE_PATH, "work", video_id)
     output_dir = os.path.join(settings.VIDEO_STORAGE_PATH, "transcoded")
     os.makedirs(work_dir, exist_ok=True)
     os.makedirs(output_dir, exist_ok=True)
 
-    # 비디오 메타데이터 상태를 'transcoding' 으로 갱신
+    # Update video metadata status to 'transcoding'
     video_key = f"video:{video_id}"
     await redis.hset(video_key, "status", "transcoding")
 
@@ -251,7 +251,7 @@ async def transcode_video(
     split_result = _dag_split(source_path, work_dir)
     dag_results.append(split_result)
 
-    # Step 2: Encode (각 해상도별) + Thumbnail (병렬 가능)
+    # Step 2: Encode (per resolution) + Thumbnail (can run in parallel)
     encode_results: list[dict[str, Any]] = []
     encoded_paths: list[str] = []
     for res in resolutions:
@@ -260,7 +260,7 @@ async def transcode_video(
         encoded_paths.append(enc["output_path"])
     dag_results.extend(encode_results)
 
-    # Step 3: Thumbnail (Encode 와 독립적으로 실행 가능)
+    # Step 3: Thumbnail (can run independently of Encode)
     thumb_result = _dag_thumbnail(source_path, work_dir)
     dag_results.append(thumb_result)
 
@@ -272,7 +272,7 @@ async def transcode_video(
     assemble_result = _dag_assemble(work_dir, output_dir, video_id, resolutions)
     dag_results.append(assemble_result)
 
-    # 비디오 메타데이터를 'ready' 로 갱신
+    # Update video metadata to 'ready'
     video_output_dir = os.path.join(output_dir, video_id)
     await redis.hset(
         video_key,

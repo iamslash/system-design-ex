@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import sys
 import os
+from typing import AsyncGenerator
 
 import pytest
 import pytest_asyncio
@@ -14,7 +15,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "api"))
 
 
 @pytest_asyncio.fixture
-async def redis_client():
+async def redis_client() -> AsyncGenerator[fakeredis.aioredis.FakeRedis, None]:
     """Create a fake async Redis client for testing."""
     client = fakeredis.aioredis.FakeRedis(decode_responses=True)
     yield client

@@ -77,6 +77,7 @@ def cmd_burst(n: int) -> None:
 
 
 def main() -> None:
+    global BASE_URL
     parser = argparse.ArgumentParser(description="Rate Limiter CLI Client")
     parser.add_argument("--health", action="store_true", help="Run health check")
     parser.add_argument("--burst", type=int, metavar="N", help="Send N requests rapidly")
@@ -85,7 +86,6 @@ def main() -> None:
 
     args = parser.parse_args()
 
-    global BASE_URL
     BASE_URL = args.base_url
 
     if args.health:

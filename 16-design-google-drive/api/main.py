@@ -1,12 +1,13 @@
 """FastAPI file sync server entry point.
 
-Google Drive 스타일의 파일 동기화 서비스를 제공한다.
-블록 단위 저장, 중복 제거, 버전 관리, long-polling 동기화를 지원한다.
+Provides a Google Drive-style file synchronization service.
+Supports block-level storage, deduplication, version management, and long-polling sync.
 """
 
 from __future__ import annotations
 
 import logging
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import Any
 
@@ -26,13 +27,13 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# 전역 Redis 클라이언트
+# Global Redis client
 redis_client: aioredis.Redis | None = None
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
-    """애플리케이션 시작/종료 시 Redis 연결을 관리한다."""
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    """Manage Redis connection on application startup/shutdown."""
     global redis_client
 
     redis_client = aioredis.Redis(
@@ -61,7 +62,7 @@ app = FastAPI(
 
 
 def _get_redis() -> aioredis.Redis:
-    """Redis 클라이언트를 반환한다. 연결되지 않았으면 503 을 발생시킨다."""
+    """Return the Redis client, raising 503 if not connected."""
     if redis_client is None:
         raise HTTPException(status_code=503, detail="Redis not connected")
     return redis_client
@@ -94,17 +95,17 @@ async def api_upload(
     user_id: str = Query(default="anonymous"),
     expected_version: int | None = Query(default=None),
 ) -> dict[str, Any]:
-    """파일을 업로드한다 (multipart).
+    """Upload a file (multipart).
 
-    블록 분할 → dedup 저장 → 메타데이터 기록.
-    expected_version 이 지정되면 충돌 검사를 수행한다.
+    Splits into blocks -> stores with dedup -> records metadata.
+    If expected_version is provided, performs conflict detection.
     """
     r = _get_redis()
 
     data = await file.read()
     filename = file.filename or "unnamed"
 
-    # 충돌 검사 (expected_version 이 지정된 경우)
+    # Conflict check (only when expected_version is specified)
     if expected_version is not None:
         from storage.file_manager import _find_file_id
 
@@ -130,7 +131,7 @@ async def api_download(
     file_id: str,
     version: int | None = Query(default=None),
 ) -> Any:
-    """파일을 다운로드한다 (블록에서 재조립)."""
+    """Download a file (reassembled from blocks)."""
     from fastapi.responses import Response
 
     r = _get_redis()
@@ -153,7 +154,7 @@ async def api_download(
 
 @app.get("/api/v1/files/{file_id}")
 async def api_get_file_metadata(file_id: str) -> dict[str, Any]:
-    """파일 메타데이터를 조회한다."""
+    """Retrieve file metadata."""
     r = _get_redis()
     meta = await get_file_metadata(r, file_id)
     if not meta:
@@ -168,7 +169,7 @@ async def api_get_file_metadata(file_id: str) -> dict[str, Any]:
 
 @app.get("/api/v1/files/{file_id}/revisions")
 async def api_get_revisions(file_id: str) -> dict[str, Any]:
-    """파일의 버전 히스토리를 조회한다."""
+    """Retrieve the version history of a file."""
     r = _get_redis()
     revisions = await get_revisions(r, file_id)
     if not revisions:
@@ -183,7 +184,7 @@ async def api_get_revisions(file_id: str) -> dict[str, Any]:
 
 @app.post("/api/v1/files/{file_id}/restore/{version}")
 async def api_restore_version(file_id: str, version: int) -> dict[str, Any]:
-    """파일을 특정 버전으로 복원한다."""
+    """Restore a file to a specific version."""
     r = _get_redis()
     try:
         result = await restore_version(r, file_id, version)
@@ -199,7 +200,7 @@ async def api_restore_version(file_id: str, version: int) -> dict[str, Any]:
 
 @app.delete("/api/v1/files/{file_id}")
 async def api_delete_file(file_id: str) -> dict[str, Any]:
-    """파일을 삭제한다."""
+    """Delete a file."""
     r = _get_redis()
     try:
         result = await delete_file(r, file_id)
@@ -217,7 +218,7 @@ async def api_delete_file(file_id: str) -> dict[str, Any]:
 async def api_list_files(
     user_id: str = Query(default="anonymous"),
 ) -> dict[str, Any]:
-    """사용자의 파일 목록을 조회한다."""
+    """List all files belonging to a user."""
     r = _get_redis()
     files = await list_files(r, user_id)
     return {"user_id": user_id, "count": len(files), "files": files}
@@ -233,9 +234,9 @@ async def api_sync_poll(
     user_id: str = Query(default="anonymous"),
     timeout: int = Query(default=None),
 ) -> dict[str, Any]:
-    """Long-polling 으로 파일 변경 이벤트를 조회한다.
+    """Retrieve file change events via long-polling.
 
-    이벤트가 있으면 즉시 반환하고, 없으면 최대 timeout 초 대기한다.
+    Returns immediately if events are available; otherwise waits up to timeout seconds.
     """
     r = _get_redis()
     events = await poll_sync_events(r, user_id, timeout)

@@ -11,21 +11,21 @@ from pydantic import BaseModel, Field
 
 
 class Channel(str, Enum):
-    """알림 채널 종류."""
+    """Types of notification channels."""
     PUSH = "push"
     SMS = "sms"
     EMAIL = "email"
 
 
 class Priority(str, Enum):
-    """알림 우선순위."""
+    """Notification priority levels."""
     HIGH = "high"
     NORMAL = "normal"
     LOW = "low"
 
 
 class NotificationStatus(str, Enum):
-    """알림 처리 상태."""
+    """Notification processing status."""
     PENDING = "pending"
     SENT = "sent"
     DELIVERED = "delivered"
@@ -33,7 +33,7 @@ class NotificationStatus(str, Enum):
 
 
 class NotificationRequest(BaseModel):
-    """알림 전송 요청 모델."""
+    """Request model for sending a notification."""
     user_id: str
     channel: Channel
     template: str = "default"
@@ -42,7 +42,7 @@ class NotificationRequest(BaseModel):
 
 
 class BatchNotificationRequest(BaseModel):
-    """배치 알림 전송 요청 모델."""
+    """Request model for sending batch notifications."""
     user_ids: list[str]
     channel: Channel
     template: str = "default"
@@ -51,7 +51,7 @@ class BatchNotificationRequest(BaseModel):
 
 
 class NotificationRecord(BaseModel):
-    """알림 로그 레코드."""
+    """Notification log record."""
     notification_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     user_id: str
     channel: Channel
@@ -65,7 +65,7 @@ class NotificationRecord(BaseModel):
 
 
 class UserPreferences(BaseModel):
-    """사용자 알림 설정 (채널별 opt-in/out)."""
+    """User notification preferences (per-channel opt-in/out)."""
     push: bool = True
     sms: bool = True
     email: bool = True

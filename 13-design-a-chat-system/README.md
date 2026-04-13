@@ -424,6 +424,16 @@ python scripts/cli.py --health
 | `HEARTBEAT_INTERVAL` | `5` | 하트비트 전송 주기 (초) |
 | `HEARTBEAT_TIMEOUT` | `30` | 오프라인 판정 타임아웃 (초) |
 
+## 테스트 실행
+
+```bash
+# 의존성 설치
+pip install -r server/requirements.txt
+
+# 테스트 실행
+pytest tests/ -v
+```
+
 ## 참고
 
 - Alex Xu, "System Design Interview - An Insider's Guide", Chapter 12

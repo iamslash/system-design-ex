@@ -5,7 +5,7 @@ from src.matching import Execution
 from src.sequencer import EventType, Sequencer
 
 
-def test_sequence_order():
+def test_sequence_order() -> None:
     """Orders should get monotonically increasing sequence IDs."""
     seq = Sequencer()
     o1 = Order(order_id="O1", symbol="AAPL", side=Side.BUY, price=100, quantity=10)
@@ -20,7 +20,7 @@ def test_sequence_order():
     assert o2.sequence_id == 2
 
 
-def test_sequence_execution():
+def test_sequence_execution() -> None:
     """Executions should also get monotonically increasing sequence IDs."""
     seq = Sequencer()
     ex = Execution(
@@ -34,7 +34,7 @@ def test_sequence_execution():
     assert ex.sequence_id == 1
 
 
-def test_event_log():
+def test_event_log() -> None:
     """Event log should contain all sequenced events in order."""
     seq = Sequencer()
     o1 = Order(order_id="O1", symbol="AAPL", side=Side.BUY, price=100, quantity=10)
@@ -47,7 +47,7 @@ def test_event_log():
     assert log[1].event_type == EventType.CANCEL_ORDER
 
 
-def test_reset():
+def test_reset() -> None:
     """Reset should clear the log and counter."""
     seq = Sequencer()
     o1 = Order(order_id="O1", symbol="AAPL", side=Side.BUY, price=100, quantity=10)

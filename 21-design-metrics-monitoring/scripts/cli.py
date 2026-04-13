@@ -139,6 +139,7 @@ def _parse_duration(s: str) -> float:
 # -----------------------------------------------------------------------
 
 def main() -> None:
+    global BASE_URL
     parser = argparse.ArgumentParser(description="Metrics Monitoring CLI")
     parser.add_argument("command", nargs="?", choices=["push", "query", "alerts", "rules"],
                         help="Command to execute")
@@ -153,7 +154,6 @@ def main() -> None:
 
     args = parser.parse_args()
 
-    global BASE_URL
     BASE_URL = args.base_url
 
     if args.health:

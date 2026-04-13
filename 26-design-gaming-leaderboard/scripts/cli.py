@@ -72,6 +72,7 @@ def cmd_around(user_id: str) -> None:
 
 
 def main() -> None:
+    global BASE_URL
     parser = argparse.ArgumentParser(description="Gaming Leaderboard CLI Client")
     parser.add_argument("--health", action="store_true", help="Run health check")
     parser.add_argument("--score", nargs=2, metavar=("USER_ID", "POINTS"), help="Score points for a user")
@@ -82,7 +83,6 @@ def main() -> None:
 
     args = parser.parse_args()
 
-    global BASE_URL
     BASE_URL = args.base_url
 
     if args.health:

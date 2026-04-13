@@ -223,7 +223,7 @@ python scripts/demo.py
 ## 테스트
 
 ```bash
-pip install pytest
+pip install -r requirements.txt
 pytest tests/ -v
 ```
 

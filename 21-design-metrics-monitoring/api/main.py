@@ -55,7 +55,7 @@ async def _alert_loop() -> None:
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI) -> None:
     """Startup / shutdown lifecycle."""
     global _redis, _storage, _collector, _query_service, _rule_engine, _notifier, _alert_task
 

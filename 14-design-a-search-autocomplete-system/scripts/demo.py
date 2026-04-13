@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Search Autocomplete Demo.
 
-검색 자동완성 시스템의 주요 기능을 시연한다.
+Demonstrates the main features of the search autocomplete system.
 
 Run:
     python scripts/demo.py
@@ -20,7 +20,7 @@ from src.autocomplete import AutocompleteService
 from src.trie import Trie
 
 
-# 샘플 검색어 빈도 테이블
+# Sample search term frequency table
 SAMPLE_FREQ_TABLE: dict[str, int] = {
     "twitter": 35000,
     "twitch": 29000,
@@ -60,7 +60,7 @@ SAMPLE_FREQ_TABLE: dict[str, int] = {
 
 
 def section(title: str) -> None:
-    """섹션 구분 출력."""
+    """Print a section separator."""
     print()
     print("=" * 70)
     print(f"  {title}")
@@ -69,7 +69,7 @@ def section(title: str) -> None:
 
 
 def demo_build_trie() -> Trie:
-    """1단계: 샘플 데이터로 Trie 구축."""
+    """Step 1: Build Trie from sample data."""
     section("1. Build Trie from Sample Data")
 
     trie = Trie(k=5)
@@ -80,7 +80,7 @@ def demo_build_trie() -> Trie:
     print(f"  Top-k (k)    : {trie.k}")
     print()
 
-    # 몇 가지 접두사 검색 시연
+    # Demonstrate a few prefix searches
     prefixes = ["tw", "tr", "wi", "ap", "ba"]
     for prefix in prefixes:
         results = trie.search(prefix)
@@ -91,13 +91,13 @@ def demo_build_trie() -> Trie:
 
 
 def demo_interactive(service: AutocompleteService) -> None:
-    """3단계: 인터랙티브 자동완성."""
+    """Step 3: Interactive autocomplete."""
     section("3. Interactive Autocomplete")
 
     print("  Type a prefix to see suggestions (empty line to skip):")
     print()
 
-    # 비대화형 환경에서는 미리 정의된 입력 사용
+    # Use predefined inputs in non-interactive environments
     demo_inputs = ["tw", "tr", "app", "ban", "wi", "to"]
 
     if not sys.stdin.isatty():
@@ -125,10 +125,10 @@ def demo_interactive(service: AutocompleteService) -> None:
 
 
 def demo_data_gathering(service: AutocompleteService) -> None:
-    """4단계: 데이터 수집 시뮬레이션."""
+    """Step 4: Data gathering simulation."""
     section("4. Data Gathering Simulation")
 
-    # 새 쿼리 기록
+    # Record new queries
     new_queries = [
         "twitter", "twitter", "twitter", "twitter", "twitter",
         "twitch streaming", "twitch streaming", "twitch streaming",
@@ -144,20 +144,20 @@ def demo_data_gathering(service: AutocompleteService) -> None:
     print(f"  Query log size: {len(service.query_log)}")
     print()
 
-    # 기존 결과
+    # Results before rebuild
     print('  Before rebuild - "tw" suggestions:')
     results = service.suggest_with_frequency("tw")
     for w, f in results:
         print(f"    {w}: {f:,}")
     print()
 
-    # Trie 재구축
+    # Rebuild Trie
     print("  Rebuilding trie (simulating weekly aggregation)...")
     service.rebuild_trie()
     print(f"  Query log cleared. Size: {len(service.query_log)}")
     print()
 
-    # 갱신된 결과
+    # Updated results
     print('  After rebuild - "tw" suggestions:')
     results = service.suggest_with_frequency("tw")
     for w, f in results:
@@ -171,7 +171,7 @@ def demo_data_gathering(service: AutocompleteService) -> None:
 
 
 def demo_filter(service: AutocompleteService) -> None:
-    """5단계: 필터 기능 시연."""
+    """Step 5: Filter feature demonstration."""
     section("5. Filter Demonstration")
 
     print('  Before filter - "tr" suggestions:')
@@ -180,7 +180,7 @@ def demo_filter(service: AutocompleteService) -> None:
         print(f"    {w}")
     print()
 
-    # 필터 추가
+    # Add filter
     blocked = {"trump", "trick"}
     print(f"  Adding filter: {blocked}")
     service.add_filter(blocked)
@@ -196,7 +196,7 @@ def demo_filter(service: AutocompleteService) -> None:
 
 
 def demo_benchmark(service: AutocompleteService) -> None:
-    """6단계: 성능 벤치마크."""
+    """Step 6: Performance benchmark."""
     section("6. Performance Benchmark")
 
     prefixes = ["t", "tw", "tr", "a", "ap", "b", "ba", "w", "wi", "to"]
@@ -233,26 +233,26 @@ def main() -> None:
     print("Search Autocomplete System Demo")
     print("================================")
 
-    # 1. Trie 구축
+    # 1. Build Trie
     trie = demo_build_trie()
 
-    # 2. AutocompleteService 생성
+    # 2. Create AutocompleteService
     section("2. AutocompleteService Setup")
     service = AutocompleteService(k=5)
     service.trie = Trie(k=5)
     service.trie.build_from_frequency_table(SAMPLE_FREQ_TABLE)
     print(f"  Service initialized with {service.trie.word_count} words")
 
-    # 3. 인터랙티브 자동완성
+    # 3. Interactive autocomplete
     demo_interactive(service)
 
-    # 4. 데이터 수집 시뮬레이션
+    # 4. Data gathering simulation
     demo_data_gathering(service)
 
-    # 5. 필터 시연
+    # 5. Filter demonstration
     demo_filter(service)
 
-    # 6. 벤치마크
+    # 6. Benchmark
     demo_benchmark(service)
 
     section("Done")

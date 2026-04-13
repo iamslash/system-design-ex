@@ -8,6 +8,7 @@ import os
 import time
 from unittest.mock import patch
 
+import fakeredis.aioredis
 import pytest
 
 # Add the api directory to the path so we can import the algorithm modules.
@@ -26,7 +27,7 @@ class TestTokenBucket:
     """Tests for the Token Bucket algorithm."""
 
     @pytest.mark.asyncio
-    async def test_allows_requests_within_limit(self, redis_client) -> None:
+    async def test_allows_requests_within_limit(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """Requests should succeed while tokens are available."""
         bucket = TokenBucket(redis_client, bucket_size=5, refill_rate=1.0)
 
@@ -37,7 +38,7 @@ class TestTokenBucket:
             assert result.limit == 5
 
     @pytest.mark.asyncio
-    async def test_rejects_when_empty(self, redis_client) -> None:
+    async def test_rejects_when_empty(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """Once all tokens are consumed, requests should be rejected."""
         bucket = TokenBucket(redis_client, bucket_size=3, refill_rate=1.0)
 
@@ -53,7 +54,7 @@ class TestTokenBucket:
         assert result.retry_after > 0
 
     @pytest.mark.asyncio
-    async def test_refills_over_time(self, redis_client) -> None:
+    async def test_refills_over_time(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """Tokens should refill after time passes."""
         bucket = TokenBucket(redis_client, bucket_size=2, refill_rate=10.0)
 
@@ -71,7 +72,7 @@ class TestTokenBucket:
         assert result.allowed
 
     @pytest.mark.asyncio
-    async def test_independent_clients(self, redis_client) -> None:
+    async def test_independent_clients(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """Different clients should have independent buckets."""
         bucket = TokenBucket(redis_client, bucket_size=2, refill_rate=1.0)
 
@@ -95,7 +96,7 @@ class TestSlidingWindowCounter:
     """Tests for the Sliding Window Counter algorithm."""
 
     @pytest.mark.asyncio
-    async def test_allows_requests_within_window(self, redis_client) -> None:
+    async def test_allows_requests_within_window(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """Requests within the limit should be allowed."""
         counter = SlidingWindowCounter(redis_client, max_requests=5, window_size=60)
 
@@ -106,7 +107,7 @@ class TestSlidingWindowCounter:
             assert result.limit == 5
 
     @pytest.mark.asyncio
-    async def test_rejects_excess_requests(self, redis_client) -> None:
+    async def test_rejects_excess_requests(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """Requests beyond the limit should be rejected."""
         counter = SlidingWindowCounter(redis_client, max_requests=3, window_size=60)
 
@@ -122,7 +123,7 @@ class TestSlidingWindowCounter:
         assert result.retry_after > 0
 
     @pytest.mark.asyncio
-    async def test_resets_after_window(self, redis_client) -> None:
+    async def test_resets_after_window(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """Requests should be allowed again after the window expires."""
         counter = SlidingWindowCounter(redis_client, max_requests=2, window_size=1)
 
@@ -140,7 +141,7 @@ class TestSlidingWindowCounter:
         assert result.allowed
 
     @pytest.mark.asyncio
-    async def test_independent_clients(self, redis_client) -> None:
+    async def test_independent_clients(self, redis_client: fakeredis.aioredis.FakeRedis) -> None:
         """Different clients should have independent counters."""
         counter = SlidingWindowCounter(redis_client, max_requests=2, window_size=60)
 

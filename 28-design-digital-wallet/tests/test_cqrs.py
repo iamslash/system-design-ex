@@ -4,7 +4,7 @@ from src.cqrs import CQRSWalletApp
 from src.state_machine import Command, CommandType
 
 
-def test_cqrs_write_and_read():
+def test_cqrs_write_and_read() -> None:
     """Read model should reflect state after write commands."""
     app = CQRSWalletApp()
     app.execute_command(Command(CommandType.CREATE_WALLET, {"wallet_id": "w1", "owner": "alice"}))
@@ -18,7 +18,7 @@ def test_cqrs_write_and_read():
     assert view.transaction_count == 1
 
 
-def test_cqrs_transfer():
+def test_cqrs_transfer() -> None:
     """Transfer should update both read model balances."""
     app = CQRSWalletApp()
     app.execute_command(Command(CommandType.CREATE_WALLET, {"wallet_id": "w1", "owner": "alice"}))
@@ -33,7 +33,7 @@ def test_cqrs_transfer():
     assert app.query_balance("w2") == 4000
 
 
-def test_cqrs_transfer_view():
+def test_cqrs_transfer_view() -> None:
     """Transfers should appear in the read model query."""
     app = CQRSWalletApp()
     app.execute_command(Command(CommandType.CREATE_WALLET, {"wallet_id": "w1", "owner": "alice"}))
@@ -50,7 +50,7 @@ def test_cqrs_transfer_view():
     assert transfers[0].amount == 3000
 
 
-def test_cqrs_failed_command_no_read_update():
+def test_cqrs_failed_command_no_read_update() -> None:
     """Failed command should not update the read model."""
     app = CQRSWalletApp()
     app.execute_command(Command(CommandType.CREATE_WALLET, {"wallet_id": "w1", "owner": "alice"}))
@@ -60,7 +60,7 @@ def test_cqrs_failed_command_no_read_update():
     assert app.query_balance("w1") == 0
 
 
-def test_cqrs_all_wallets():
+def test_cqrs_all_wallets() -> None:
     """query_all_wallets should list all created wallets."""
     app = CQRSWalletApp()
     app.execute_command(Command(CommandType.CREATE_WALLET, {"wallet_id": "w1", "owner": "alice"}))

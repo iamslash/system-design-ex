@@ -206,7 +206,7 @@ python scripts/demo.py
 ## 테스트
 
 ```bash
-pip install fakeredis redis pytest pytest-asyncio
+pip install -r api/requirements.txt
 pytest tests/ -v
 ```
 

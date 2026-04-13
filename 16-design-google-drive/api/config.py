@@ -12,13 +12,13 @@ class Settings:
     REDIS_HOST: str = os.getenv("REDIS_HOST", "localhost")
     REDIS_PORT: int = int(os.getenv("REDIS_PORT", "6379"))
 
-    # 블록 크기 (바이트) — 파일을 이 크기로 분할한다
+    # Block size in bytes — files are split into chunks of this size
     BLOCK_SIZE: int = int(os.getenv("BLOCK_SIZE", "4096"))
 
-    # Long polling 타임아웃 (초)
+    # Long-polling timeout in seconds
     POLL_TIMEOUT: int = int(os.getenv("POLL_TIMEOUT", "30"))
 
-    # 블록 저장 경로
+    # Directory path for block storage
     BLOCK_STORAGE_PATH: str = os.getenv("BLOCK_STORAGE_PATH", "/data/blocks")
 
 

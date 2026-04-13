@@ -292,6 +292,14 @@ Request 2 ─┘         └─ read counter = 4 (정확)
 | Sliding Window Log | 높음 | X | 높음 | 보통 |
 | Sliding Window Counter | 낮음 | X | 높음 | 보통 |
 
+## 테스트 실행
+
+```bash
+cd 05-design-a-rate-limiter
+pip install -r api/requirements.txt
+pytest tests/ -v
+```
+
 ## 참고
 
 - Alex Xu, "System Design Interview - An Insider's Guide", Chapter 4

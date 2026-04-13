@@ -11,7 +11,7 @@ class TestFrontierPriority:
     """Priority ordering tests."""
 
     def test_higher_priority_first(self) -> None:
-        """낮은 priority 값이 먼저 반환되어야 한다."""
+        """Lower priority values should be returned first."""
         frontier = URLFrontier(politeness_delay=0.0)
         frontier.add("http://low.com", priority=9, depth=0)
         frontier.add("http://high.com", priority=1, depth=0)
@@ -30,7 +30,7 @@ class TestFrontierPriority:
         assert entry.url == "http://low.com"
 
     def test_fifo_within_same_priority(self) -> None:
-        """같은 priority 내에서는 FIFO 순서를 유지해야 한다."""
+        """FIFO order should be maintained within the same priority level."""
         frontier = URLFrontier(politeness_delay=0.0)
         frontier.add("http://first.com", priority=5, depth=0)
         frontier.add("http://second.com", priority=5, depth=0)
@@ -49,7 +49,7 @@ class TestFrontierPriority:
         ]
 
     def test_empty_frontier_returns_none(self) -> None:
-        """빈 frontier 에서 get_next 는 None 을 반환해야 한다."""
+        """get_next should return None for an empty frontier."""
         frontier = URLFrontier()
         assert frontier.get_next() is None
         assert frontier.is_empty
@@ -59,33 +59,33 @@ class TestFrontierPoliteness:
     """Per-host politeness delay tests."""
 
     def test_wait_time_initially_zero(self) -> None:
-        """첫 방문 호스트에 대한 대기 시간은 0 이어야 한다."""
+        """Wait time should be 0 for a host that has never been visited."""
         frontier = URLFrontier(politeness_delay=1.0)
         wait = frontier.get_wait_time("http://example.com/page1")
         assert wait == 0.0
 
     def test_wait_time_after_access(self) -> None:
-        """방문 직후 같은 호스트에 대한 대기 시간은 양수여야 한다."""
+        """Wait time should be positive immediately after visiting the same host."""
         frontier = URLFrontier(politeness_delay=1.0)
         frontier.record_access("http://example.com/page1")
         wait = frontier.get_wait_time("http://example.com/page2")
         assert wait > 0.0
 
     def test_different_hosts_independent(self) -> None:
-        """다른 호스트의 대기 시간은 서로 독립적이어야 한다."""
+        """Wait times for different hosts should be independent."""
         frontier = URLFrontier(politeness_delay=1.0)
         frontier.record_access("http://a.com/page")
 
-        # a.com 은 대기 필요
+        # a.com requires waiting
         wait_a = frontier.get_wait_time("http://a.com/other")
         assert wait_a > 0.0
 
-        # b.com 은 대기 불필요
+        # b.com requires no waiting
         wait_b = frontier.get_wait_time("http://b.com/page")
         assert wait_b == 0.0
 
     def test_wait_time_decreases_over_time(self) -> None:
-        """시간이 지나면 대기 시간이 줄어야 한다."""
+        """Wait time should decrease as time passes."""
         frontier = URLFrontier(politeness_delay=0.1)
         frontier.record_access("http://example.com/page")
         wait1 = frontier.get_wait_time("http://example.com/other")
@@ -99,7 +99,7 @@ class TestFrontierDepth:
     """Max depth tests."""
 
     def test_within_max_depth_accepted(self) -> None:
-        """max_depth 이내의 URL 은 추가되어야 한다."""
+        """URLs within max_depth should be accepted."""
         frontier = URLFrontier(max_depth=2)
         assert frontier.add("http://a.com", depth=0) is True
         assert frontier.add("http://b.com", depth=1) is True
@@ -107,13 +107,13 @@ class TestFrontierDepth:
         assert frontier.size == 3
 
     def test_exceeding_max_depth_rejected(self) -> None:
-        """max_depth 를 초과하는 URL 은 무시되어야 한다."""
+        """URLs exceeding max_depth should be ignored."""
         frontier = URLFrontier(max_depth=2)
         assert frontier.add("http://deep.com", depth=3) is False
         assert frontier.size == 0
 
     def test_depth_stored_in_entry(self) -> None:
-        """FrontierEntry 에 depth 가 올바르게 저장되어야 한다."""
+        """depth should be stored correctly in FrontierEntry."""
         frontier = URLFrontier(max_depth=5)
         frontier.add("http://example.com", depth=3)
         entry = frontier.get_next()

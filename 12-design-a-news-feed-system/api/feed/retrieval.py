@@ -1,9 +1,9 @@
 """News feed retrieval and hydration.
 
-사용자의 피드를 조회하고, 각 포스트와 작성자 정보를 hydrate 하여
-완전한 피드 항목을 반환한다.
+Retrieves a user's feed, hydrates each post with author information,
+and returns complete feed items.
 
-Redis 데이터 구조:
+Redis data structures:
   feed:{user_id} — ZSET: score=timestamp, member=post_id
   post:{post_id} — HASH: {user_id, content, created_at, likes}
   user:{user_id} — HASH: {name, created_at}
@@ -22,29 +22,29 @@ async def get_feed(
     offset: int = 0,
     limit: int = 20,
 ) -> list[dict[str, Any]]:
-    """사용자의 뉴스 피드를 역시간순으로 조회한다.
+    """Retrieve a user's news feed in reverse chronological order.
 
-    처리 흐름:
-      1. feed:{user_id} Sorted Set 에서 ZREVRANGE 로 post_id 목록 조회
-      2. 각 post_id 로 post:{post_id} 해시에서 포스트 데이터 조회 (hydration)
-      3. 각 포스트의 user_id 로 user:{user_id} 해시에서 작성자 정보 조회
-      4. 포스트 + 작성자 정보를 합쳐 반환
+    Processing flow:
+      1. Fetch post_id list from feed:{user_id} Sorted Set using ZREVRANGE
+      2. Fetch post data for each post_id from the post:{post_id} hash (hydration)
+      3. Fetch author information for each post from the user:{user_id} hash
+      4. Merge post data with author information and return
     """
     feed_key = f"feed:{user_id}"
 
-    # 1. 피드에서 post_id 목록을 역시간순으로 조회
+    # 1. Fetch post_id list from the feed in reverse chronological order
     post_ids: list[str] = await redis.zrevrange(feed_key, offset, offset + limit - 1)
 
     if not post_ids:
         return []
 
-    # 2. 각 포스트 데이터를 파이프라인으로 일괄 조회
+    # 2. Batch-fetch each post's data via pipeline
     pipe = redis.pipeline()
     for post_id in post_ids:
         pipe.hgetall(f"post:{post_id}")
     post_results = await pipe.execute()
 
-    # 3. 작성자 정보를 일괄 조회 (중복 제거)
+    # 3. Batch-fetch author information (deduplicated)
     author_ids: set[str] = set()
     posts: list[dict[str, str]] = []
     for post_data in post_results:
@@ -52,7 +52,7 @@ async def get_feed(
             posts.append(post_data)
             author_ids.add(post_data.get("user_id", ""))
 
-    # 작성자 정보 파이프라인 조회
+    # Fetch author information via pipeline
     author_map: dict[str, dict[str, str]] = {}
     if author_ids:
         pipe = redis.pipeline()
@@ -64,7 +64,7 @@ async def get_feed(
             if adata:
                 author_map[aid] = adata
 
-    # 4. 포스트 + 작성자 정보를 합쳐 반환
+    # 4. Merge post data with author information and return
     feed_items: list[dict[str, Any]] = []
     for post in posts:
         author_id = post.get("user_id", "")

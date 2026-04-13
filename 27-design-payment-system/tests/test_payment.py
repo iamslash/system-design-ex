@@ -8,7 +8,7 @@ from payment.service import PaymentService
 
 
 @pytest.mark.asyncio
-async def test_create_payment_success(payment_service: PaymentService):
+async def test_create_payment_success(payment_service: PaymentService) -> None:
     """Successful payment should transition NOT_STARTED -> EXECUTING -> SUCCESS."""
     result = await payment_service.create_payment(
         buyer_id="buyer_1",
@@ -27,7 +27,7 @@ async def test_create_payment_success(payment_service: PaymentService):
 
 
 @pytest.mark.asyncio
-async def test_idempotency_prevents_duplicate(payment_service: PaymentService):
+async def test_idempotency_prevents_duplicate(payment_service: PaymentService) -> None:
     """Same idempotency key should return the original payment, not create a new one."""
     first = await payment_service.create_payment(
         buyer_id="buyer_1",
@@ -50,7 +50,7 @@ async def test_idempotency_prevents_duplicate(payment_service: PaymentService):
 
 
 @pytest.mark.asyncio
-async def test_get_payment(payment_service: PaymentService):
+async def test_get_payment(payment_service: PaymentService) -> None:
     """Should retrieve a stored payment by ID."""
     created = await payment_service.create_payment(
         buyer_id="buyer_1",
@@ -68,14 +68,14 @@ async def test_get_payment(payment_service: PaymentService):
 
 
 @pytest.mark.asyncio
-async def test_get_payment_not_found(payment_service: PaymentService):
+async def test_get_payment_not_found(payment_service: PaymentService) -> None:
     """Should return None for a non-existent payment."""
     result = await payment_service.get_payment("pay_nonexistent")
     assert result is None
 
 
 @pytest.mark.asyncio
-async def test_failed_payment(failing_payment_service: PaymentService):
+async def test_failed_payment(failing_payment_service: PaymentService) -> None:
     """Payment with a failing PSP should end in FAILED status."""
     result = await failing_payment_service.create_payment(
         buyer_id="buyer_1",
@@ -90,7 +90,7 @@ async def test_failed_payment(failing_payment_service: PaymentService):
 
 
 @pytest.mark.asyncio
-async def test_retry_failed_payment(failing_payment_service: PaymentService, payment_service: PaymentService):
+async def test_retry_failed_payment(failing_payment_service: PaymentService, payment_service: PaymentService) -> None:
     """Retry should attempt to re-execute a FAILED payment."""
     failed = await failing_payment_service.create_payment(
         buyer_id="buyer_1",
@@ -110,7 +110,7 @@ async def test_retry_failed_payment(failing_payment_service: PaymentService, pay
 
 
 @pytest.mark.asyncio
-async def test_retry_non_failed_payment_raises(payment_service: PaymentService):
+async def test_retry_non_failed_payment_raises(payment_service: PaymentService) -> None:
     """Retry on a SUCCESS payment should raise ValueError."""
     created = await payment_service.create_payment(
         buyer_id="buyer_1",
@@ -126,7 +126,7 @@ async def test_retry_non_failed_payment_raises(payment_service: PaymentService):
 
 
 @pytest.mark.asyncio
-async def test_invalid_amount(payment_service: PaymentService):
+async def test_invalid_amount(payment_service: PaymentService) -> None:
     """Negative amount should raise ValueError."""
     with pytest.raises(ValueError, match="Amount must be positive"):
         await payment_service.create_payment(

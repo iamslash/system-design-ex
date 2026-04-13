@@ -1,13 +1,14 @@
 """FastAPI news feed server entry point.
 
-뉴스 피드 시스템의 HTTP API 를 제공한다.
-Redis 를 캐시 겸 저장소로 사용한다.
+Provides the HTTP API for the news feed system.
+Redis is used as both a cache and data store.
 """
 
 from __future__ import annotations
 
 import logging
 import time
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import Any
 
@@ -26,13 +27,13 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# 전역 Redis 클라이언트
+# Global Redis client
 redis_client: aioredis.Redis | None = None
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
-    """애플리케이션 시작/종료 시 Redis 연결을 관리한다."""
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    """Manage Redis connection on application startup/shutdown."""
     global redis_client
 
     redis_client = aioredis.Redis(
@@ -57,7 +58,7 @@ app = FastAPI(
 
 
 def _get_redis() -> aioredis.Redis:
-    """Redis 클라이언트를 반환한다. 연결되지 않았으면 503 을 발생시킨다."""
+    """Return the Redis client, raising 503 if not connected."""
     if redis_client is None:
         raise HTTPException(status_code=503, detail="Redis not connected")
     return redis_client
@@ -86,7 +87,7 @@ async def health() -> dict[str, Any]:
 
 @app.post("/api/v1/users")
 async def create_user(request: CreateUserRequest) -> dict[str, Any]:
-    """사용자를 생성한다."""
+    """Create a user."""
     r = _get_redis()
     user_key = f"user:{request.user_id}"
 
@@ -112,7 +113,7 @@ async def create_user(request: CreateUserRequest) -> dict[str, Any]:
 
 @app.post("/api/v1/posts")
 async def api_create_post(request: CreatePostRequest) -> dict[str, Any]:
-    """포스트를 생성한다."""
+    """Create a post."""
     r = _get_redis()
     result = await create_post(r, request.user_id, request.content)
     return result
@@ -120,7 +121,7 @@ async def api_create_post(request: CreatePostRequest) -> dict[str, Any]:
 
 @app.get("/api/v1/posts/{post_id}")
 async def api_get_post(post_id: str) -> dict[str, Any]:
-    """포스트를 조회한다."""
+    """Retrieve a post by ID."""
     r = _get_redis()
     post = await get_post(r, post_id)
     if not post:
@@ -135,7 +136,7 @@ async def api_get_post(post_id: str) -> dict[str, Any]:
 
 @app.get("/api/v1/feed/{user_id}")
 async def api_get_feed(user_id: str, offset: int = 0, limit: int = 20) -> dict[str, Any]:
-    """사용자의 뉴스 피드를 조회한다."""
+    """Retrieve the news feed for a user."""
     r = _get_redis()
     feed_items = await get_feed(r, user_id, offset=offset, limit=limit)
     return {
@@ -152,7 +153,7 @@ async def api_get_feed(user_id: str, offset: int = 0, limit: int = 20) -> dict[s
 
 @app.post("/api/v1/follow")
 async def api_follow(request: FollowRequest) -> dict[str, Any]:
-    """사용자를 팔로우한다."""
+    """Follow a user."""
     r = _get_redis()
     result = await follow(r, request.follower_id, request.followee_id)
     return result
@@ -160,7 +161,7 @@ async def api_follow(request: FollowRequest) -> dict[str, Any]:
 
 @app.post("/api/v1/unfollow")
 async def api_unfollow(request: UnfollowRequest) -> dict[str, Any]:
-    """사용자를 언팔로우한다."""
+    """Unfollow a user."""
     r = _get_redis()
     result = await unfollow(r, request.follower_id, request.followee_id)
     return result
@@ -168,7 +169,7 @@ async def api_unfollow(request: UnfollowRequest) -> dict[str, Any]:
 
 @app.get("/api/v1/friends/{user_id}")
 async def api_friends(user_id: str) -> dict[str, Any]:
-    """사용자의 친구 목록(팔로잉/팔로워)을 조회한다."""
+    """Retrieve the friends list (following/followers) for a user."""
     r = _get_redis()
     following_list = await get_following(r, user_id)
     followers_list = await get_followers(r, user_id)

@@ -83,6 +83,7 @@ def cmd_stats(short_code: str) -> None:
 
 
 def main() -> None:
+    global BASE_URL
     parser = argparse.ArgumentParser(description="URL Shortener CLI Client")
     parser.add_argument("--health", action="store_true", help="Run health check")
     parser.add_argument("--base-url", type=str, default=BASE_URL, help="API base URL")
@@ -100,7 +101,6 @@ def main() -> None:
 
     args = parser.parse_args()
 
-    global BASE_URL
     BASE_URL = args.base_url
 
     if args.health:

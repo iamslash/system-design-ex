@@ -1,7 +1,7 @@
 """Email channel handler (simulated).
 
-실제 환경에서는 SendGrid, Mailgun, Amazon SES 등의 이메일 API 를 호출하지만,
-여기서는 로그 출력으로 시뮬레이션한다.
+In a real environment this would call an email API such as SendGrid, Mailgun,
+or Amazon SES.  Here we simulate delivery with log output.
 """
 
 from __future__ import annotations
@@ -20,16 +20,16 @@ async def send_email(
     body: str,
     failure_rate: float | None = None,
 ) -> bool:
-    """이메일을 전송한다 (시뮬레이션).
+    """Send an email (simulated).
 
     Args:
-        user_id: 대상 사용자 ID.
-        title: 알림 제목 (Subject).
-        body: 알림 본문.
-        failure_rate: 실패 확률 오버라이드 (테스트용).
+        user_id: Target user ID.
+        title: Notification subject line.
+        body: Notification body text.
+        failure_rate: Override failure probability (for testing).
 
     Returns:
-        True 이면 전송 성공, False 이면 실패.
+        True if delivery succeeded, False otherwise.
     """
     rate = failure_rate if failure_rate is not None else settings.FAILURE_RATE
 

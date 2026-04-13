@@ -1,8 +1,8 @@
 """Sync conflict resolution.
 
-동시에 같은 파일을 수정하면 충돌이 발생한다.
-"first writer wins" 전략: 먼저 업로드한 버전이 반영되고,
-나중에 업로드한 사용자에게는 충돌 응답을 반환한다.
+When the same file is modified concurrently, a conflict occurs.
+"First writer wins" strategy: the first uploaded version is accepted,
+and a conflict response is returned to the user who uploads later.
 """
 
 from __future__ import annotations
@@ -18,27 +18,27 @@ async def check_conflict(
     file_id: str,
     expected_version: int,
 ) -> dict[str, Any] | None:
-    """파일의 현재 버전과 클라이언트가 기대하는 버전을 비교하여 충돌을 감지한다.
+    """Detect a conflict by comparing the server's current version with the client's expected version.
 
-    클라이언트가 "나는 v2 기반으로 수정했다" 라고 보냈는데
-    서버의 최신 버전이 v3 이면 충돌이 발생한 것이다.
+    If the client sends "I modified based on v2" but the server's latest version
+    is v3, a conflict has occurred.
 
     Args:
-        redis: Redis 클라이언트
-        file_id: 파일 ID
-        expected_version: 클라이언트가 기대하는 (마지막으로 알고 있는) 버전
+        redis: Redis client
+        file_id: File ID
+        expected_version: The version the client expects (last known version)
 
     Returns:
-        충돌 정보 딕셔너리 (충돌 없으면 None)
+        Conflict info dictionary, or None if there is no conflict
     """
     file_meta = await redis.hgetall(f"file:{file_id}")
     if not file_meta:
-        return None  # 파일이 없으면 충돌 아님 (새 파일)
+        return None  # No conflict if the file doesn't exist yet (new file)
 
     server_version = int(file_meta.get("latest_version", "0"))
 
     if server_version > expected_version:
-        # 충돌 발생: 서버에 더 최신 버전이 있다
+        # Conflict: the server has a newer version
         return {
             "conflict": True,
             "file_id": file_id,
@@ -58,14 +58,14 @@ async def resolve_conflict_first_writer_wins(
     file_id: str,
     expected_version: int,
 ) -> dict[str, Any] | None:
-    """First-writer-wins 충돌 해결.
+    """First-writer-wins conflict resolution.
 
-    파일의 최신 버전이 expected_version 과 같으면 충돌 없음 (업로드 진행).
-    최신 버전이 expected_version 보다 크면 충돌 반환.
+    No conflict if the file's latest version equals expected_version (upload proceeds).
+    Returns a conflict if the latest version is greater than expected_version.
 
-    이 함수는 업로드 전에 호출되어야 한다.
+    This function must be called before performing the upload.
 
     Returns:
-        충돌이 없으면 None, 충돌이면 충돌 정보 딕셔너리
+        None if no conflict, or a conflict info dictionary if conflicted
     """
     return await check_conflict(redis, file_id, expected_version)

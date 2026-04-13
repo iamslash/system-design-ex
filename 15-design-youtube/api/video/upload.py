@@ -1,12 +1,13 @@
 """Video upload with chunked/resumable support.
 
-청크 단위 업로드를 지원하여 대용량 비디오 파일을 안정적으로 업로드한다.
-각 청크는 임시 디렉토리에 저장되며, 모든 청크가 업로드되면 하나의 파일로 합친다.
+Supports chunk-based upload for reliably uploading large video files.
+Each chunk is stored in a temporary directory and merged into a single file
+once all chunks have been uploaded.
 
-흐름:
-  1. 클라이언트가 업로드 시작 요청 → upload_id 발급
-  2. 클라이언트가 청크를 순차적 또는 병렬로 업로드
-  3. 모든 청크 업로드 후 완료 요청 → 청크 병합 → 트랜스코딩 트리거
+Flow:
+  1. Client sends upload initiation request -> upload_id issued
+  2. Client uploads chunks sequentially or in parallel
+  3. After all chunks uploaded, client sends complete request -> merge -> transcode trigger
 """
 
 from __future__ import annotations
@@ -26,25 +27,25 @@ async def initiate_upload(
     description: str,
     total_chunks: int,
 ) -> dict[str, Any]:
-    """업로드를 시작하고 upload_id 를 발급한다.
+    """Initiate an upload and issue an upload_id.
 
-    Pre-signed URL 시뮬레이션: 실제 시스템에서는 S3 pre-signed URL 을
-    발급하여 클라이언트가 직접 스토리지에 업로드하도록 한다.
-    여기서는 upload_id 를 토큰처럼 사용한다.
+    Pre-signed URL simulation: in a real system, an S3 pre-signed URL would be
+    issued so the client uploads directly to storage.
+    Here, upload_id is used as a token equivalent.
 
     Args:
-        redis: Redis 클라이언트
-        title: 비디오 제목
-        description: 비디오 설명
-        total_chunks: 총 청크 수
+        redis: Redis client
+        title: Video title
+        description: Video description
+        total_chunks: Total number of chunks
 
     Returns:
-        upload_id, pre-signed URL (시뮬레이션) 등의 업로드 정보
+        Upload info including upload_id and pre-signed URL (simulated)
     """
     upload_id = str(uuid.uuid4())
     video_id = str(uuid.uuid4())
 
-    # 업로드 상태를 Redis 에 저장
+    # Store upload state in Redis
     upload_key = f"upload:{upload_id}"
     await redis.hset(
         upload_key,
@@ -59,7 +60,7 @@ async def initiate_upload(
         },
     )
 
-    # 청크 저장 디렉토리 생성
+    # Create chunk storage directory
     chunk_dir = os.path.join(settings.VIDEO_STORAGE_PATH, "chunks", upload_id)
     os.makedirs(chunk_dir, exist_ok=True)
 
@@ -78,19 +79,19 @@ async def upload_chunk(
     chunk_index: int,
     chunk_data: bytes,
 ) -> dict[str, Any]:
-    """청크 하나를 업로드한다.
+    """Upload a single chunk.
 
-    Resumable upload: 이미 업로드된 청크는 덮어쓴다.
-    클라이언트는 실패한 청크만 다시 업로드하면 된다.
+    Resumable upload: already-uploaded chunks are overwritten.
+    The client only needs to re-upload failed chunks.
 
     Args:
-        redis: Redis 클라이언트
-        upload_id: 업로드 ID
-        chunk_index: 청크 인덱스 (0-based)
-        chunk_data: 청크 바이너리 데이터
+        redis: Redis client
+        upload_id: Upload ID
+        chunk_index: Chunk index (0-based)
+        chunk_data: Chunk binary data
 
     Returns:
-        업로드 상태 정보
+        Upload status info
     """
     upload_key = f"upload:{upload_id}"
     upload_info = await redis.hgetall(upload_key)
@@ -105,7 +106,7 @@ async def upload_chunk(
     if chunk_index < 0 or chunk_index >= total_chunks:
         return {"error": f"Invalid chunk index: {chunk_index}", "upload_id": upload_id}
 
-    # 청크를 파일로 저장
+    # Save chunk to file
     chunk_dir = os.path.join(settings.VIDEO_STORAGE_PATH, "chunks", upload_id)
     os.makedirs(chunk_dir, exist_ok=True)
     chunk_path = os.path.join(chunk_dir, f"chunk_{chunk_index:05d}")
@@ -113,12 +114,12 @@ async def upload_chunk(
     with open(chunk_path, "wb") as f:
         f.write(chunk_data)
 
-    # 업로드된 청크 추적 (Redis Set 사용)
+    # Track uploaded chunks using a Redis Set
     chunk_set_key = f"upload_chunks:{upload_id}"
     await redis.sadd(chunk_set_key, str(chunk_index))
     uploaded_count = await redis.scard(chunk_set_key)
 
-    # 업로드 진행률 갱신
+    # Update upload progress
     await redis.hset(upload_key, "uploaded_chunks", str(uploaded_count))
 
     return {
@@ -134,19 +135,19 @@ async def complete_upload(
     redis: Redis,
     upload_id: str,
 ) -> dict[str, Any]:
-    """업로드를 완료하고 청크를 하나의 파일로 병합한다.
+    """Complete the upload and merge chunks into a single file.
 
-    모든 청크가 업로드되었는지 확인한 뒤:
-      1. 청크 파일들을 순서대로 읽어 하나의 파일로 합침
-      2. 비디오 상태를 'transcoding' 으로 변경
-      3. 임시 청크 디렉토리 정리
+    After verifying all chunks have been uploaded:
+      1. Read chunk files in order and merge into one file
+      2. Change video status to 'transcoding'
+      3. Clean up temporary chunk directory
 
     Args:
-        redis: Redis 클라이언트
-        upload_id: 업로드 ID
+        redis: Redis client
+        upload_id: Upload ID
 
     Returns:
-        완료된 비디오 정보
+        Completed video info
     """
     upload_key = f"upload:{upload_id}"
     upload_info = await redis.hgetall(upload_key)
@@ -170,11 +171,11 @@ async def complete_upload(
 
     video_id = upload_info["video_id"]
 
-    # 비디오 저장 디렉토리 생성
+    # Create video storage directory
     video_dir = os.path.join(settings.VIDEO_STORAGE_PATH, "originals")
     os.makedirs(video_dir, exist_ok=True)
 
-    # 청크를 하나의 파일로 병합
+    # Merge chunks into a single file
     chunk_dir = os.path.join(settings.VIDEO_STORAGE_PATH, "chunks", upload_id)
     output_path = os.path.join(video_dir, f"{video_id}.mp4")
 
@@ -185,13 +186,13 @@ async def complete_upload(
                 with open(chunk_path, "rb") as chunk_file:
                     outfile.write(chunk_file.read())
 
-    # 업로드 상태 갱신
+    # Update upload status
     await redis.hset(upload_key, "status", "completed")
 
-    # 청크 추적 정리
+    # Clean up chunk tracking
     await redis.delete(chunk_set_key)
 
-    # 청크 파일 정리
+    # Clean up chunk files
     for i in range(total_chunks):
         chunk_path = os.path.join(chunk_dir, f"chunk_{i:05d}")
         if os.path.exists(chunk_path):
@@ -215,7 +216,7 @@ async def get_upload_status(
     redis: Redis,
     upload_id: str,
 ) -> dict[str, Any] | None:
-    """업로드 상태를 조회한다."""
+    """Get upload status."""
     upload_key = f"upload:{upload_id}"
     info = await redis.hgetall(upload_key)
     if not info:

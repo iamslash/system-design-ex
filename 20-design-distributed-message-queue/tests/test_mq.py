@@ -30,10 +30,10 @@ from src.replication import AckMode, ReplicatedPartition
 
 
 @pytest.fixture(autouse=True)
-def _clean_offset_store():
+def _clean_offset_store() -> None:
     """Reset global offset store before each test."""
     reset_offset_store()
-    yield
+    yield  # type: ignore[misc]
     reset_offset_store()
 
 
@@ -45,14 +45,14 @@ def _clean_offset_store():
 class TestPartitionAppendRead:
     """Test basic append and read on a partition."""
 
-    def test_append_single_record(self):
+    def test_append_single_record(self) -> None:
         p = Partition("t", 0)
         rec = p.append("k1", b"hello")
         assert rec.offset == 0
         assert rec.key == "k1"
         assert rec.value == b"hello"
 
-    def test_append_increments_offset(self):
+    def test_append_increments_offset(self) -> None:
         p = Partition("t", 0)
         r0 = p.append("k1", b"a")
         r1 = p.append("k2", b"b")
@@ -61,7 +61,7 @@ class TestPartitionAppendRead:
         assert r1.offset == 1
         assert r2.offset == 2
 
-    def test_read_from_start(self):
+    def test_read_from_start(self) -> None:
         p = Partition("t", 0)
         for i in range(5):
             p.append(f"k{i}", f"v{i}".encode())
@@ -70,7 +70,7 @@ class TestPartitionAppendRead:
         assert records[0].offset == 0
         assert records[4].offset == 4
 
-    def test_read_from_middle(self):
+    def test_read_from_middle(self) -> None:
         p = Partition("t", 0)
         for i in range(10):
             p.append(None, f"v{i}".encode())
@@ -79,11 +79,11 @@ class TestPartitionAppendRead:
         assert records[0].offset == 5
         assert records[2].offset == 7
 
-    def test_read_empty_partition(self):
+    def test_read_empty_partition(self) -> None:
         p = Partition("t", 0)
         assert p.read(0) == []
 
-    def test_fifo_ordering(self):
+    def test_fifo_ordering(self) -> None:
         p = Partition("t", 0)
         values = [f"msg-{i}".encode() for i in range(20)]
         for v in values:
@@ -91,7 +91,7 @@ class TestPartitionAppendRead:
         records = p.read(0, max_records=20)
         assert [r.value for r in records] == values
 
-    def test_log_end_offset(self):
+    def test_log_end_offset(self) -> None:
         p = Partition("t", 0)
         assert p.log_end_offset == 0
         p.append(None, b"a")
@@ -103,7 +103,7 @@ class TestPartitionAppendRead:
 class TestSegments:
     """Test segment rotation when max_size is reached."""
 
-    def test_segment_rotation(self):
+    def test_segment_rotation(self) -> None:
         cfg = PartitionConfig(segment_max_size=3)
         p = Partition("t", 0, cfg)
         for i in range(7):
@@ -114,7 +114,7 @@ class TestSegments:
         assert p.segments[1].sealed
         assert not p.segments[2].sealed
 
-    def test_read_across_segments(self):
+    def test_read_across_segments(self) -> None:
         cfg = PartitionConfig(segment_max_size=2)
         p = Partition("t", 0, cfg)
         for i in range(6):
@@ -123,7 +123,7 @@ class TestSegments:
         assert len(records) == 6
         assert [r.offset for r in records] == list(range(6))
 
-    def test_read_spanning_segment_boundary(self):
+    def test_read_spanning_segment_boundary(self) -> None:
         cfg = PartitionConfig(segment_max_size=3)
         p = Partition("t", 0, cfg)
         for i in range(9):
@@ -134,7 +134,7 @@ class TestSegments:
         assert records[0].offset == 2
         assert records[4].offset == 6
 
-    def test_sealed_segment_rejects_append(self):
+    def test_sealed_segment_rejects_append(self) -> None:
         seg = Segment(base_offset=0, max_size=2)
         seg.append(None, b"a", time.time())
         seg.seal()
@@ -148,25 +148,25 @@ class TestSegments:
 
 
 class TestBroker:
-    def test_create_and_list_topics(self):
+    def test_create_and_list_topics(self) -> None:
         b = Broker()
         b.create_topic("orders", TopicConfig(num_partitions=4))
         b.create_topic("events", TopicConfig(num_partitions=2))
         assert sorted(b.list_topics()) == ["events", "orders"]
 
-    def test_duplicate_topic_raises(self):
+    def test_duplicate_topic_raises(self) -> None:
         b = Broker()
         b.create_topic("t1")
         with pytest.raises(ValueError, match="already exists"):
             b.create_topic("t1")
 
-    def test_delete_topic(self):
+    def test_delete_topic(self) -> None:
         b = Broker()
         b.create_topic("t1")
         b.delete_topic("t1")
         assert b.list_topics() == []
 
-    def test_produce_and_consume(self):
+    def test_produce_and_consume(self) -> None:
         b = Broker()
         b.create_topic("t1", TopicConfig(num_partitions=1))
         b.produce("t1", 0, "k1", b"hello")
@@ -182,7 +182,7 @@ class TestBroker:
 
 
 class TestProducerBatching:
-    def test_batch_accumulation(self):
+    def test_batch_accumulation(self) -> None:
         b = Broker()
         b.create_topic("t", TopicConfig(num_partitions=1))
         p = Producer(b, ProducerConfig(batch_size=5))
@@ -191,7 +191,7 @@ class TestProducerBatching:
             assert result == []  # Not flushed yet.
         assert p.pending_count == 4
 
-    def test_auto_flush_on_batch_full(self):
+    def test_auto_flush_on_batch_full(self) -> None:
         b = Broker()
         b.create_topic("t", TopicConfig(num_partitions=1))
         p = Producer(b, ProducerConfig(batch_size=3))
@@ -203,7 +203,7 @@ class TestProducerBatching:
         assert len(result) == 3
         assert p.pending_count == 0
 
-    def test_explicit_flush(self):
+    def test_explicit_flush(self) -> None:
         b = Broker()
         b.create_topic("t", TopicConfig(num_partitions=1))
         p = Producer(b, ProducerConfig(batch_size=100))
@@ -214,7 +214,7 @@ class TestProducerBatching:
         assert len(records) == 10
         assert p.pending_count == 0
 
-    def test_sent_count_tracking(self):
+    def test_sent_count_tracking(self) -> None:
         b = Broker()
         b.create_topic("t", TopicConfig(num_partitions=1))
         p = Producer(b, ProducerConfig(batch_size=100))
@@ -225,7 +225,7 @@ class TestProducerBatching:
 
 
 class TestProducerPartitionRouting:
-    def test_key_based_routing_deterministic(self):
+    def test_key_based_routing_deterministic(self) -> None:
         b = Broker()
         b.create_topic("t", TopicConfig(num_partitions=4))
         p = Producer(b, ProducerConfig(batch_size=1))
@@ -238,7 +238,7 @@ class TestProducerPartitionRouting:
         # Offsets should be sequential in the same partition.
         assert results2[0].offset == results1[0].offset + 1
 
-    def test_round_robin_without_key(self):
+    def test_round_robin_without_key(self) -> None:
         b = Broker()
         b.create_topic("t", TopicConfig(num_partitions=3))
         p = Producer(b, ProducerConfig(batch_size=1))
@@ -259,7 +259,7 @@ class TestProducerPartitionRouting:
 
 
 class TestConsumerOffsetTracking:
-    def test_manual_offset_commit(self):
+    def test_manual_offset_commit(self) -> None:
         store = OffsetStore()
         b = Broker()
         b.create_topic("t", TopicConfig(num_partitions=1))
@@ -276,7 +276,7 @@ class TestConsumerOffsetTracking:
         c.commit()
         assert c.committed("t", 0) == 2
 
-    def test_auto_commit(self):
+    def test_auto_commit(self) -> None:
         store = OffsetStore()
         b = Broker()
         b.create_topic("t", TopicConfig(num_partitions=1))
@@ -286,7 +286,7 @@ class TestConsumerOffsetTracking:
         c.poll()
         assert c.committed("t", 0) == 1
 
-    def test_seek(self):
+    def test_seek(self) -> None:
         b = Broker()
         b.create_topic("t", TopicConfig(num_partitions=1))
         for i in range(5):
@@ -298,7 +298,7 @@ class TestConsumerOffsetTracking:
         assert len(result[("t", 0)]) == 2
         assert result[("t", 0)][0].offset == 3
 
-    def test_seek_unassigned_raises(self):
+    def test_seek_unassigned_raises(self) -> None:
         b = Broker()
         b.create_topic("t", TopicConfig(num_partitions=1))
         c = Consumer("c1", b)
@@ -306,7 +306,7 @@ class TestConsumerOffsetTracking:
         with pytest.raises(ValueError, match="not assigned"):
             c.seek("t", 99, 0)
 
-    def test_resume_from_committed_offset(self):
+    def test_resume_from_committed_offset(self) -> None:
         store = OffsetStore()
         b = Broker()
         b.create_topic("t", TopicConfig(num_partitions=1))
@@ -335,7 +335,7 @@ class TestConsumerOffsetTracking:
 
 
 class TestConsumerGroups:
-    def test_partition_assignment_even(self):
+    def test_partition_assignment_even(self) -> None:
         b = Broker()
         b.create_topic("t", TopicConfig(num_partitions=4))
         store = OffsetStore()
@@ -348,7 +348,7 @@ class TestConsumerGroups:
         assert len(assignment["c1"]) == 2
         assert len(assignment["c2"]) == 2
 
-    def test_partition_assignment_uneven(self):
+    def test_partition_assignment_uneven(self) -> None:
         b = Broker()
         b.create_topic("t", TopicConfig(num_partitions=5))
         store = OffsetStore()
@@ -361,7 +361,7 @@ class TestConsumerGroups:
         assert len(assignment["c1"]) == 3
         assert len(assignment["c2"]) == 2
 
-    def test_rebalance_on_consumer_add(self):
+    def test_rebalance_on_consumer_add(self) -> None:
         b = Broker()
         b.create_topic("t", TopicConfig(num_partitions=6))
         store = OffsetStore()
@@ -377,7 +377,7 @@ class TestConsumerGroups:
         assert len(assignment["c2"]) == 2
         assert len(assignment["c3"]) == 2
 
-    def test_rebalance_on_consumer_remove(self):
+    def test_rebalance_on_consumer_remove(self) -> None:
         b = Broker()
         b.create_topic("t", TopicConfig(num_partitions=4))
         store = OffsetStore()
@@ -392,7 +392,7 @@ class TestConsumerGroups:
         assert "c1" not in assignment
         assert len(assignment["c2"]) == 4
 
-    def test_each_partition_consumed_by_one_consumer(self):
+    def test_each_partition_consumed_by_one_consumer(self) -> None:
         b = Broker()
         b.create_topic("t", TopicConfig(num_partitions=6))
         for pid in range(6):
@@ -414,7 +414,7 @@ class TestConsumerGroups:
         assert partitions_c1.isdisjoint(partitions_c2)
         assert partitions_c1 | partitions_c2 == set(range(6))
 
-    def test_multiple_topics(self):
+    def test_multiple_topics(self) -> None:
         b = Broker()
         b.create_topic("t1", TopicConfig(num_partitions=2))
         b.create_topic("t2", TopicConfig(num_partitions=2))
@@ -435,7 +435,7 @@ class TestConsumerGroups:
 
 
 class TestReplication:
-    def test_leader_write(self):
+    def test_leader_write(self) -> None:
         rp = ReplicatedPartition(
             topic="t", partition_id=0,
             leader_broker_id=0,
@@ -446,7 +446,7 @@ class TestReplication:
         assert rec.offset == 0
         assert rec.value == b"hello"
 
-    def test_follower_fetch(self):
+    def test_follower_fetch(self) -> None:
         rp = ReplicatedPartition(
             topic="t", partition_id=0,
             leader_broker_id=0,
@@ -462,7 +462,7 @@ class TestReplication:
         # Follower partition should have the data.
         assert rp.followers[1].partition.log_end_offset == 2
 
-    def test_ack_all_replicates_synchronously(self):
+    def test_ack_all_replicates_synchronously(self) -> None:
         rp = ReplicatedPartition(
             topic="t", partition_id=0,
             leader_broker_id=0,
@@ -474,7 +474,7 @@ class TestReplication:
         assert rp.followers[1].leo == 1
         assert rp.followers[2].leo == 1
 
-    def test_ack_none_does_not_replicate(self):
+    def test_ack_none_does_not_replicate(self) -> None:
         rp = ReplicatedPartition(
             topic="t", partition_id=0,
             leader_broker_id=0,
@@ -485,7 +485,7 @@ class TestReplication:
         # Follower should NOT have the data.
         assert rp.followers[1].leo == 0
 
-    def test_high_watermark_advances_with_isr(self):
+    def test_high_watermark_advances_with_isr(self) -> None:
         rp = ReplicatedPartition(
             topic="t", partition_id=0,
             leader_broker_id=0,
@@ -501,7 +501,7 @@ class TestReplication:
         # Now follower is caught up, HW should advance.
         assert rp.high_watermark == 2
 
-    def test_consume_only_committed_records(self):
+    def test_consume_only_committed_records(self) -> None:
         rp = ReplicatedPartition(
             topic="t", partition_id=0,
             leader_broker_id=0,
@@ -521,7 +521,7 @@ class TestReplication:
 
 
 class TestISR:
-    def test_isr_includes_all_initially(self):
+    def test_isr_includes_all_initially(self) -> None:
         rp = ReplicatedPartition(
             topic="t", partition_id=0,
             leader_broker_id=0,
@@ -529,7 +529,7 @@ class TestISR:
         )
         assert rp.isr == {0, 1, 2}
 
-    def test_follower_removed_from_isr_on_lag(self):
+    def test_follower_removed_from_isr_on_lag(self) -> None:
         rp = ReplicatedPartition(
             topic="t", partition_id=0,
             leader_broker_id=0,
@@ -545,7 +545,7 @@ class TestISR:
         # Follower fetched 1 record but is still 4 behind (lag=4 > max=2).
         assert 1 not in rp.isr
 
-    def test_follower_rejoins_isr_after_catching_up(self):
+    def test_follower_rejoins_isr_after_catching_up(self) -> None:
         rp = ReplicatedPartition(
             topic="t", partition_id=0,
             leader_broker_id=0,
@@ -562,7 +562,7 @@ class TestISR:
         rp.follower_fetch(1, max_records=100)
         assert 1 in rp.isr
 
-    def test_leader_always_in_isr(self):
+    def test_leader_always_in_isr(self) -> None:
         rp = ReplicatedPartition(
             topic="t", partition_id=0,
             leader_broker_id=0,
@@ -580,7 +580,7 @@ class TestISR:
 
 
 class TestDeliverySemantics:
-    def test_at_most_once_no_reread(self):
+    def test_at_most_once_no_reread(self) -> None:
         """At-most-once: commit before processing. If processing fails,
         the message is lost (offset already advanced)."""
         store = OffsetStore()
@@ -598,7 +598,7 @@ class TestDeliverySemantics:
         result2 = c.poll()
         assert ("t", 0) not in result2
 
-    def test_at_least_once_redelivery(self):
+    def test_at_least_once_redelivery(self) -> None:
         """At-least-once: process then commit. If crash before commit,
         messages are redelivered."""
         store = OffsetStore()
@@ -617,7 +617,7 @@ class TestDeliverySemantics:
         assert len(result[("t", 0)]) == 1
         assert result[("t", 0)][0].value == b"msg1"
 
-    def test_exactly_once_idempotent_pattern(self):
+    def test_exactly_once_idempotent_pattern(self) -> None:
         """Exactly-once via idempotent consumer: deduplicate by offset."""
         store = OffsetStore()
         b = Broker()
@@ -650,7 +650,7 @@ class TestDeliverySemantics:
 
 
 class TestIntegration:
-    def test_end_to_end_produce_consume(self):
+    def test_end_to_end_produce_consume(self) -> None:
         b = Broker()
         b.create_topic("orders", TopicConfig(num_partitions=3))
         p = Producer(b, ProducerConfig(batch_size=2))
@@ -666,7 +666,7 @@ class TestIntegration:
             all_records.extend(b.consume("orders", pid, 0))
         assert len(all_records) == 6
 
-    def test_consumer_group_e2e(self):
+    def test_consumer_group_e2e(self) -> None:
         b = Broker()
         b.create_topic("events", TopicConfig(num_partitions=4))
         p = Producer(b, ProducerConfig(batch_size=1))
@@ -688,7 +688,7 @@ class TestIntegration:
                 all_records.extend(recs)
         assert len(all_records) == 8
 
-    def test_replicated_broker_e2e(self):
+    def test_replicated_broker_e2e(self) -> None:
         b = Broker(broker_id=0, peer_broker_ids=[1, 2])
         b.create_topic(
             "t",

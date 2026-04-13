@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
@@ -38,7 +39,7 @@ versioning_svc: VersioningService | None = None
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Manage Redis connection and data store lifecycle."""
     global redis_client, data_store, bucket_svc, object_svc, versioning_svc
 

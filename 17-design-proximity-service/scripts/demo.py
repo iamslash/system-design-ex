@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Proximity Service Demo.
 
-Geohash, Quadtree, Proximity Service 의 주요 기능을 시연한다.
+Demonstrates the key features of Geohash, Quadtree, and Proximity Service.
 
 Run:
     python scripts/demo.py

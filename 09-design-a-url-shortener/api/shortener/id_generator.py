@@ -1,33 +1,33 @@
 """Counter-based ID generator using Redis INCR.
 
-Redis 의 INCR 명령으로 원자적(atomic) 자동 증가 카운터를 구현한다.
-생성된 ID 를 Base62 로 인코딩하여 단축 코드로 사용한다.
+Implements an atomic auto-increment counter using Redis INCR.
+The generated ID is encoded in Base62 and used as the short code.
 """
 
 from __future__ import annotations
 
 from redis.asyncio import Redis
 
-# Redis 카운터 키
+# Redis counter key
 COUNTER_KEY = "url:id_counter"
 
-# 시작 값 (1억부터 시작하면 최소 5자 이상의 코드가 생성됨)
+# Start value (starting from 100 million ensures at least 5 characters in the code)
 START_VALUE = 100_000_000
 
 
 async def next_id(redis: Redis) -> int:
-    """다음 고유 ID 를 생성한다.
+    """Generate the next unique ID.
 
-    Redis INCR 을 사용하여 원자적으로 카운터를 증가시킨다.
-    첫 호출 시 START_VALUE 부터 시작한다.
+    Uses Redis INCR to atomically increment the counter.
+    On the first call, starts from START_VALUE.
 
     Args:
-        redis: Redis 클라이언트.
+        redis: Redis client.
 
     Returns:
-        새로운 고유 정수 ID.
+        A new unique integer ID.
     """
-    # 카운터가 존재하지 않으면 START_VALUE 로 초기화
+    # Initialize to START_VALUE if the counter does not exist
     exists = await redis.exists(COUNTER_KEY)
     if not exists:
         await redis.set(COUNTER_KEY, START_VALUE)
